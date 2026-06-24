@@ -11,6 +11,9 @@ node_modules/
 !/input/boundaries/uk22_bfc.json.gz
 !/input/boundaries/uk22_bgc.json.gz
 !/input/boundaries/uk22_buc.json.gz
+!/input/lookups/lookup_bestfit_oa21.json
+!/input/lookups/lookup_bestfit_lsoa21.json
+!/input/lookups/lookup_bestfit_msoa21.json
 !/input/lookups/lookup.csv
 /temp/*
 /output/*
