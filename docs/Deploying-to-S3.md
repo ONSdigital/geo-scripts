@@ -114,4 +114,4 @@ aws s3 cp "$TILES/metadata.json" "$TILES/metadata.json" --metadata-directive REP
 
 The CDN will keep serving the cached copy until it expires, unless the cache is purged.
 
-*As of October 2026, the live `metadata.json` files checked (eg. `administrative/2025/wd/metadata.json`) are served with `Content-Encoding: gzip` but are not gzipped, so they need this fix.*
+*In October 2026, every live tileset `metadata.json` checked was served with `Content-Encoding: gzip` but was not gzipped, so they need this fix. Those checked were 2021 MSOA, 2022 LTLA, 2024 WPC, 2025 authorities-all and 2025 wards.*
