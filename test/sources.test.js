@@ -24,11 +24,14 @@ const catalogue = [
   "LAD_MAY_2025_UK_BUC",
   "LAD_MAY_2025_UK_NC",
   "Local_Authority_Districts_May_2026_Boundaries_UK_BFE",
-  "Local_Authority_Districts_May_2026_Boundaries_UK_BGC",
   "Local_Authority_Districts_May_2026_Boundaries_UK_BSC",
   "LAD_DEC_2024_UK_BFE",
   "Wards_May_2024_Boundaries_UK_BFC",
+  "Local_Authority_Districts_December_2023_UK_BFE",
+  "Wards_December_2024_Boundaries_UK_BFC",
+  "WD_MAY_2025_UK_BFC",
   "WD_DEC_2025_UK_BFC",
+  "WD_DEC_2025_UK_BFC_V2",
   "WD_DEC_2025_UK_BFC_RUC"
 ];
 
@@ -52,14 +55,25 @@ test("checkManifest flags datasets with a newer version", () => {
   assert.deepEqual(result.candidates, ["LAD_MAY_2025_UK_BGC_V3"]);
 });
 
-test("findNewReleases lists newer releases with the manifest's detail levels", () => {
+test("findNewReleases suggests the latest release in each calendar year", () => {
   assert.deepEqual(findNewReleases(manifest, catalogue), [
-    {key: "ltla", code: "LAD", year: 2026, month: "may", ids: {
+    // A later release within a year already in the manifest
+    {key: "ltla", code: "LAD", year: 2023, month: "dec", status: "update", ids: {
+      bfe: "Local_Authority_Districts_December_2023_UK_BFE"
+    }, missing: []},
+    // A new year, with the detail levels of the latest year in the manifest. BUC falls
+    // back to BSC, and details the release doesn't have are listed as missing.
+    // (LAD_DEC_2024 is ignored: 2024 is between configured years, so it was left out deliberately.)
+    {key: "ltla", code: "LAD", year: 2026, month: "may", status: "new", ids: {
       bfe: "Local_Authority_Districts_May_2026_Boundaries_UK_BFE",
-      bgc: "Local_Authority_Districts_May_2026_Boundaries_UK_BGC",
       buc: "Local_Authority_Districts_May_2026_Boundaries_UK_BSC"
-    }},
-    // Only the detail levels the manifest uses (bfc), ignoring variants like _RUC
-    {key: "wd", code: "WD", year: 2025, month: "dec", ids: {bfc: "WD_DEC_2025_UK_BFC"}}
+    }, missing: ["bgc"]},
+    {key: "wd", code: "WD", year: 2024, month: "dec", status: "update", ids: {
+      bfc: "Wards_December_2024_Boundaries_UK_BFC"
+    }, missing: []},
+    // Only the December release for 2025 (not May), at its highest version, ignoring _RUC variants
+    {key: "wd", code: "WD", year: 2025, month: "dec", status: "new", ids: {
+      bfc: "WD_DEC_2025_UK_BFC_V2"
+    }, missing: []}
   ]);
 });

@@ -57,8 +57,13 @@ export function checkManifest(files, catalogue) {
   });
 }
 
-// Find releases newer than the latest one in the manifest for each geography.
-// Returns [{key, code, year, month, ids: {detail: name}}], oldest first.
+// Boundaries change at most once a year, so each calendar year uses the most recent
+// release published in that year. For each geography, this finds:
+//   - "update": a later release within a year already in the manifest (eg. Dec 2025
+//     when the manifest uses May 2025 for 2025)
+//   - "new": the latest release for each year after the latest year in the manifest
+// All detail levels come from the same release; any it doesn't have are listed in missing.
+// Returns [{key, code, year, month, status, ids: {detail: name}, missing: [detail]}].
 export function findNewReleases(files, catalogue) {
   const parsed = catalogue.map(parseServiceName).filter(p => p && p.detail && !p.variant);
   const families = familiesByKey(files);
@@ -66,24 +71,42 @@ export function findNewReleases(files, catalogue) {
 
   for (const key of Object.keys(families)) {
     const keyFiles = files.filter(f => f.key === key);
-    const latest = Math.max(...keyFiles.map(f => parseServiceName(f.id)).filter(p => p).map(releaseOrder));
-    const details = new Set(keyFiles.map(f => f.detail));
-    const groups = {};
+    const years = [...new Set(keyFiles.map(f => f.year))].sort((a, b) => a - b);
+    const latestYear = years[years.length - 1];
+
+    // The latest release in each calendar year, with its datasets by detail level
+    const byYear = {};
     for (const p of parsed) {
-      if (!families[key].has(p.familyKey) || releaseOrder(p) <= latest) continue;
-      const id = `${p.year}-${p.month || ""}`;
-      groups[id] ||= {key, code: keyFiles[0].code, year: p.year, month: p.month, options: {}};
-      (groups[id].options[p.detail] ||= []).push(p);
+      if (!families[key].has(p.familyKey)) continue;
+      const latest = byYear[p.year];
+      if (!latest || releaseOrder(p) > latest.order) byYear[p.year] = {order: releaseOrder(p), month: p.month, options: {}};
+      if (releaseOrder(p) === byYear[p.year].order) (byYear[p.year].options[p.detail] ||= []).push(p);
     }
-    for (const group of Object.values(groups)) {
+
+    for (const year of Object.keys(byYear).map(Number).sort((a, b) => a - b)) {
+      let status, details;
+      if (years.includes(year)) {
+        const yearFiles = keyFiles.filter(f => f.year === year);
+        const current = Math.max(...yearFiles.map(f => parseServiceName(f.id)).filter(p => p).map(releaseOrder));
+        if (byYear[year].order <= current) continue;
+        status = "update";
+        details = yearFiles.map(f => f.detail);
+      } else if (year > latestYear) {
+        status = "new";
+        details = keyFiles.filter(f => f.year === latestYear).map(f => f.detail);
+      } else continue;
+
+      const {month, options} = byYear[year];
       const ids = {};
+      const missing = [];
       for (const detail of details) {
         // Use BSC for a BUC slot when no BUC has been published
-        const options = group.options[detail] || (detail === "buc" ? group.options.bsc : null);
-        if (options) ids[detail] = options.sort(byVersion)[0].name;
+        const found = options[detail] || (detail === "buc" ? options.bsc : null);
+        if (found) ids[detail] = found.sort(byVersion)[0].name;
+        else missing.push(detail);
       }
-      if (Object.keys(ids).length) releases.push({key, code: group.code, year: group.year, month: group.month, ids});
+      if (Object.keys(ids).length) releases.push({key, code: keyFiles[0].code, year, month, status, ids, missing});
     }
   }
-  return releases.sort((a, b) => a.key.localeCompare(b.key) || releaseOrder(a) - releaseOrder(b));
+  return releases.sort((a, b) => a.key.localeCompare(b.key) || a.year - b.year);
 }

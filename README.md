@@ -67,7 +67,7 @@ The Geoportal sometimes retires datasets or re-publishes them under new names (e
 npm run check-sources
 ```
 
-This checks every dataset in `/config/source-files.js` against the Geoportal, suggests replacements for any that are missing or out of date, and lists newly published releases as entries ready to paste into the config. Suggestions are checked to have the expected fields, but always review them before using them.
+This checks every dataset in `/config/source-files.js` against the Geoportal, suggests replacements for any that are missing or out of date, and lists newer releases as entries ready to paste into the config. Boundaries and codes change at most once a year, so each calendar year should use the most recent release published in it: the script suggests one release per year, covering both new years and later releases within years already in the config (eg. December rather than May). Suggestions are checked to have the expected fields, but always review them before using them.
 
 ### Tests
 
@@ -159,7 +159,7 @@ To generate partial outputs, use the `--geo` and `--year` options (see above) ra
 
 It should be possible to add additional geographies or years by modifying the config files, without the need to edit the script files. To add a newly published year of a geography:
 
-1. Run `npm run check-sources` and copy the suggested entry for the new release into `/config/source-files.js`.
+1. Run `npm run check-sources` and copy the suggested entry for the new year into `/config/source-files.js`. (For a later release within a year already in the config, replace that year's entry instead, and re-download it with `--force`.)
 2. Add the year to the geography's `years` in `/config/geo-config.js` (and add a tileset to `/config/vtiles-config.js` if needed).
 3. Run `npm test` to check the config is consistent.
 4. Download the new files with `npm run download-files -- --geo {key} --year {year}`, then run the rest of the pipeline (eg. `npm run all-scripts -- --geo {key}`).

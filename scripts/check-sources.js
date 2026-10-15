@@ -4,6 +4,9 @@
 // Usage: npm run check-sources [-- --no-verify]
 //   --no-verify  skip checking that suggested datasets contain the expected fields
 //
+// Each calendar year should use the most recent release published in that year,
+// since boundaries and codes change at most once a year.
+//
 // Suggestions are printed for review, not written to the config: dataset names on
 // the Geoportal are inconsistent, so always check a suggestion before using it.
 import { parseArgs } from "util";
@@ -55,20 +58,25 @@ for (const {file, status, candidates} of problems) {
   }
 }
 
-// 2. New releases, as entries ready to paste into config/source-files.js
+// 2. Newer releases (one per calendar year), as entries ready to paste into config/source-files.js
 const releases = findNewReleases(files, catalogue);
-console.log(`\n== New releases: ${releases.length} found ==`);
+const monthName = (m) => m ? `${m[0].toUpperCase()}${m.slice(1)} ` : "";
+console.log(`\n== Newer releases: ${releases.length} found ==`);
 for (const release of releases) {
-  const label = `${release.month ? `${release.month[0].toUpperCase()}${release.month.slice(1)} ` : ""}${release.year}`;
-  console.log(`\n// ${release.key} ${label}`);
+  const label = `${monthName(release.month)}${release.year}`;
+  console.log(release.status === "update" ?
+    `\n// ${release.key} ${release.year}: replace the existing entry with the later ${label} release` :
+    `\n// ${release.key} ${release.year}: new year (${label} release)`);
   console.log(`{key: "${release.key}", year: ${release.year}, code: "${release.code}", ids: {`);
   for (const [detail, name] of Object.entries(release.ids)) {
     const check = await verify(name, release.code);
     console.log(`  ${detail}: "${name}",${check ? ` // ${check}` : ""}`);
   }
+  for (const detail of release.missing) console.log(`  // ${detail}: not published in this release - find one manually`);
   console.log("}},");
 }
 if (releases.length) {
-  console.log("\nTo use a new release, add its entry to config/source-files.js and its year to config/geo-config.js " +
-    "(and config/vtiles-config.js if needed). If two releases share a year, choose one.");
+  console.log("\nBoundaries change at most once a year, so each year uses the most recent release published in it. " +
+    "For a new year, add its entry to config/source-files.js and the year to config/geo-config.js " +
+    "(and config/vtiles-config.js if needed). For an update, replace the year's entry, then re-download with --force.");
 }

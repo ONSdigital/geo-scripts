@@ -21,11 +21,11 @@ export class ArcGISError extends Error {
 export function checkResponse(json, id) {
   if (json?.error) {
     const {code, details = []} = json.error;
-    const message = json.error.message || "Unknown error";
+    const message = json.error.message || details[0] || "Unknown error";
     const extra = details.filter(d => d !== message);
     const err = new ArcGISError(`${message}${extra.length ? ` (${extra.join("; ")})` : ""}`, code, id);
     if (err.unavailable) {
-      err.message = `Dataset "${id}" is unavailable from the Geoportal API: ${err.message}. ` +
+      err.message = `Dataset "${id}" is unavailable from the Geoportal API: ${err.message.replace(/\.$/, "")}. ` +
         "It may have been retired or replaced by a new version - run `npm run check-sources` to find replacements.";
     }
     throw err;

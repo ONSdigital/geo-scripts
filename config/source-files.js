@@ -8,6 +8,9 @@
 // Boundaries are needed for every year of every geography. Every detail level is included for
 // the benefit of the vector tiles; BFE files are used for calculating accurate lookups.
 //
+// year is the calendar year. Boundaries and codes change at most once a year, so use the
+// most recent release published in that year (eg. December rather than May, if both exist).
+//
 // The Geoportal sometimes retires datasets or replaces them with new versions (eg. "_V2"). Run
 // `npm run check-sources` to check these IDs and to find newly published years.
 export default {
