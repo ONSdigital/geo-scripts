@@ -37,19 +37,31 @@ function childYearValid(parent, child) {
   return true;
 }
 
-function getChildren(lookup, lookup_data, code) {
-  let children = lookup_data.filter(d => d.parentcd === code && childYearValid(lookup[code], d));
+// Rows of the lookup grouped by a column, in their original order
+function groupBy(data, key) {
+  const groups = new Map();
+  for (const d of data) {
+    if (!d[key]) continue;
+    const group = groups.get(d[key]);
+    if (group) group.push(d);
+    else groups.set(d[key], [d]);
+  }
+  return groups;
+}
+
+function getChildren(lookup, by_parent, code) {
+  let children = (by_parent.get(code) || []).filter(d => childYearValid(lookup[code], d));
   return children.map(child => propsToNames(child))
     .sort((a, b) => a.areacd.localeCompare(b.areacd));
 }
 
-function getSuperseded(lookup_data, code) {
-  let superseded = lookup_data.filter(d => d.successorcd === code);
+function getSuperseded(by_successor, code) {
+  let superseded = by_successor.get(code) || [];
   return superseded.map(sup => propsToNames(sup))
     .sort((a, b) => a.areacd.localeCompare(b.areacd));
 }
 
-function makeGeo(geo, year, lookup_data, lookup, census_lookup) {
+function makeGeo(geo, year, indexes, lookup, census_lookup) {
   return new Promise((resolve) => {
     const yr = String(year).slice(-2);
     const detail = geo.detail || "bgc";
@@ -88,11 +100,11 @@ function makeGeo(geo, year, lookup_data, lookup, census_lookup) {
 
         // Add superseded geographies for new geographies
         if (lkp.start) {
-          props.replaces = getSuperseded(lookup_data, areacd);
+          props.replaces = getSuperseded(indexes.by_successor, areacd);
         }
 
         // Add parents and children
-        props.children = getChildren(lookup, lookup_data, areacd);
+        props.children = getChildren(lookup, indexes.by_parent, areacd);
         props.child_typecds = props.children[0] ?
           Array.from(new Set(props.children.map(c => c.areacd.slice(0, 3)))).sort((a, b) => a.localeCompare(b)) :
           [];
@@ -179,6 +191,10 @@ const lookup_data = csvParse(lookup_raw)
   }));
 const lookup = {};
 for (const d of lookup_data) lookup[d.areacd] = d;
+const indexes = {
+  by_parent: groupBy(lookup_data, "parentcd"),
+  by_successor: groupBy(lookup_data, "successorcd")
+};
 
 // Load census lookups
 const census_lookup = {};
@@ -193,7 +209,7 @@ mkdir(dirs.geos);
 // Generate geo files
 for (const geo of geos) {
   for (let year of [...geo.years].reverse()) {
-    await makeGeo(geo, year, lookup_data, lookup, census_lookup);
+    await makeGeo(geo, year, indexes, lookup, census_lookup);
   }
 }
 

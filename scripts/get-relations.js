@@ -4,6 +4,7 @@ import readline from "line-by-line";
 import { booleanPointInPolygon, intersect, area, booleanContains, booleanIntersects } from "@turf/turf";
 import { csvFormat } from "d3-dsv";
 import { csvParse, getValidBoundariesPath } from "./utils.js";
+import { bboxIndex } from "./lib/spatial.js";
 import geo_config from "../config/geo-config.js";
 import { files } from "../config/paths.js";
 
@@ -167,6 +168,20 @@ for (const d of data) {
   data_indexed[d.areacd] = d;
 }
 
+// Grid indexes of each group's bboxes, so each area is only compared with nearby
+// candidate parents/successors (in their original order, which breaks ties later)
+const group_indexes = {};
+function groupIndex(cd) {
+  if (!group_indexes[cd]) {
+    const bounds = (data_grouped[cd] || []).map(d => d.bounds);
+    const sizes = bounds.map(b => Math.max(b[2] - b[0], b[3] - b[1])).sort((a, b) => a - b);
+    const cellSize = Math.min(Math.max(sizes[Math.floor(sizes.length / 2)] || 1, 0.01), 1);
+    group_indexes[cd] = bboxIndex(bounds, cellSize);
+  }
+  return group_indexes[cd];
+}
+const candidates = (cd, d) => groupIndex(cd).queryPoint(d.centroid).map(i => data_grouped[cd][i]);
+
 const parents = {};
 const poss_children = {};
 const poss_parents = {};
@@ -181,7 +196,7 @@ for (const d of data) {
     if (!parent_grps.includes(cd)) parent_grps.push(cd);
     p_parents = [
       ...p_parents,
-      ...(data_grouped[cd] || []).filter(p => isParent(p, d) && isMatchingYear(p, d)).map(p => p.areacd)
+      ...candidates(cd, d).filter(p => isParent(p, d) && isMatchingYear(p, d)).map(p => p.areacd)
     ];
   }
   if (p_parents.length === 1) {
@@ -214,7 +229,7 @@ for (const d of data) {
     for (const cd of lookup[grp].siblings) {
       p_successors = [
         ...p_successors,
-        ...(data_grouped[cd] || []).filter(s => isNextYear(s, d) && isParent(s, d)).map(s => s.areacd)
+        ...candidates(cd, d).filter(s => isNextYear(s, d) && isParent(s, d)).map(s => s.areacd)
       ];
     }
     if (p_successors.length === 1) {
