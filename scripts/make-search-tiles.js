@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, appendFileSync, createReadStream } from "f
 import zlib from "zlib";
 import readline from "line-by-line";
 import geos from "../config/geo-config.js";
+import { dirs, files } from "../config/paths.js";
 import { run, getValidBoundariesPath, writeGzip, clearTemp, mkdir, csvParse } from "./utils.js";
 
 const sources = geos
@@ -74,7 +75,7 @@ function makeGeoJSONTiles(path, yr) {
         // const z = +line.match(/(?<="zoom":\s)\d+(?=,)/)[0];
         const x = +line.match(/(?<="x":\s)\d+(?=,)/)[0];
         const y = +line.match(/(?<="y":\s)\d+(?=\s)/)[0];
-        const dir = `./output/search${yr}/${x}`;
+        const dir = `${dirs.search(yr)}/${x}`;
         const path = `${dir}/${y}.json`;
         const json = {type: "FeatureCollection", features: []};
         currentTile = {dir, path, json};
@@ -105,7 +106,7 @@ function makeGeoJSONTiles(path, yr) {
 }
 
 // Load lookup data
-const lookup_path = "./input/lookups/lookup.csv";
+const lookup_path = files.lookup;
 const lookup_raw = readFileSync(lookup_path, {encoding: 'utf8', flag: 'r'});
 const lookup_data = csvParse(lookup_raw);
 const lookup = {};

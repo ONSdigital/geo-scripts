@@ -6,11 +6,12 @@
 import { readFileSync, writeFileSync } from "fs";
 import { csvFormat } from "d3-dsv";
 import { csvParse, makeLookup } from "./utils.js";
+import { files } from "../config/paths.js";
 
-const areas = csvParse(readFileSync("./input/lookups/lookup.csv", {encoding: 'utf8', flag: 'r'}));
+const areas = csvParse(readFileSync(files.lookup, {encoding: 'utf8', flag: 'r'}));
 const areas_lookup = makeLookup(areas);
 
-const codes_raw = readFileSync("./input/census/oa21_lsoa21_msoa21_ltla22.csv", {encoding: 'utf8', flag: 'r'});
+const codes_raw = readFileSync(files.censusLookup, {encoding: 'utf8', flag: 'r'});
 const oa_data = csvParse(
   codes_raw,
   d => ({areacd: d.oa21cd, parentcd: d.lsoa21cd, msoa: d.msoa21cd, area: areas_lookup[d.oa21cd].areakm2})
@@ -96,10 +97,10 @@ for (let i = 0; i < merges.length; i ++) {
 }
 const oa_lookup = Object.keys(oa_index).map(key => oa_index[key]);
 
-const oa_path = "./input/lookups/lookup_vtiles_oa21.csv";
+const oa_path = files.vtilesLookup("oa");
 writeFileSync(oa_path, csvFormat(oa_lookup, cols));
 console.log(`Wrote ${oa_path}`);
 
-const msoa_path = "./input/lookups/lookup_vtiles_msoa21.csv";
+const msoa_path = files.vtilesLookup("msoa");
 writeFileSync(msoa_path, csvFormat(msoa_data.map(d => ({areacd: d.areacd, childcd: d.child}))));
 console.log(`Wrote ${msoa_path}`);

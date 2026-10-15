@@ -5,13 +5,14 @@ import { csvFormat } from "d3-dsv";
 import { bbox, area } from "@turf/turf";
 import { csvParse, round, roundAll, findPolylabel } from "./utils.js";
 import geo_config from "../config/geo-config.js";
+import { dirs, files } from "../config/paths.js";
 
 const startTime = new Date();
 
-const geo_dir = "./input/boundaries"
-const msoa_path = "./input/other/msoa_names.csv";
-const outpath = "./input/lookups/lookup_metadata.csv";
-const names_outpath = "./input/lookups/lookup_names.csv";
+const geo_dir = dirs.boundaries;
+const msoa_path = files.msoaNames;
+const outpath = files.metadata;
+const names_outpath = files.names;
 
 const cols = [
   "areacd", "areanm", "areanmw",
@@ -31,7 +32,7 @@ let typeyrs = {};
 function getGeoMetadata(geo) {
   return new Promise((resolve) => {
     const filter = geo_config.find(d => d.key === geo.cd)?.codes;
-    const input = `./input/boundaries/${geo.path}`;
+    const input = `${geo_dir}/${geo.path}`;
 
     console.log(`Getting metadata from ${geo.path}`);
     const keys = [];

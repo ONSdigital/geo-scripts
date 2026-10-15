@@ -5,6 +5,7 @@ import polylabel from "polylabel";
 import { exec } from "child_process";
 import * as d3 from "d3-dsv";
 import geo_config from "../config/geo-config.js";
+import { dirs } from "../config/paths.js";
 
 export function csvParse(str, row = d3.autoType) {
   return d3.csvParse(str.replace(/\uFEFF/, ''), row);
@@ -116,7 +117,7 @@ export function findPolylabel(feature) {
 
 export function getValidBoundariesPath(key, yr, detail = ["bfe", "bfc"]) {
   for (const det of detail) {
-    const path = `./input/boundaries/${key}${yr}_${det}.json.gz`;
+    const path = `${dirs.boundaries}/${key}${yr}_${det}.json.gz`;
     if (fs.existsSync(path)) return path;
   }
   console.log(`Valid file path not found for ${key} and ${yr}!`);

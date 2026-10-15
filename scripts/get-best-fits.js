@@ -4,6 +4,7 @@ import readline from "line-by-line";
 import { bbox, bboxPolygon, booleanPointInPolygon } from "@turf/turf";
 import { csvParse, getValidBoundariesPath } from "./utils.js";
 import geo_config from "../config/geo-config.js";
+import { files } from "../config/paths.js";
 
 const startTime = new Date();
 
@@ -36,7 +37,7 @@ async function getGeoJSON(path) {
 // "Frozen" lookup for Census 2021 geographies
 function makeCensusLookup() {
   console.log("Making census lookup...");
-  const path = "./input/census/oa21_lsoa21_msoa21_ltla22.csv";
+  const path = files.censusLookup;
   const data_raw = readFileSync(path, {encoding: 'utf8', flag: 'r'});
   const data = csvParse(data_raw);
   const cols = ["oa21cd", "lsoa21cd", "msoa21cd", "ltla22cd"];
@@ -137,7 +138,7 @@ const census_lookup = makeCensusLookup();
 for (const key of geo_keys) {
   console.log(`Getting ${key} best-fits...`);
   const best_fits = {};
-  const centroids_path = `./input/centroids/${key}21_pwc.json.gz`;
+  const centroids_path = files.centroids(key, 2021);
   const centroids = await getGeoJSON(centroids_path);
   for (const geo of geo_config.filter(g => ![...geo_keys, ...skip_keys].includes(g.key))) {
     for (const year of geo.years) {
@@ -145,7 +146,7 @@ for (const key of geo_keys) {
       await getBestFits(path, geo, centroids, census_lookup[key], best_fits, key);
     }
   }
-  const outpath = `./input/lookups/lookup_bestfit_${key}21.json`;
+  const outpath = files.bestFit(key);
   writeFileSync(outpath, JSON.stringify(best_fits));
   console.log(`Wrote ${outpath}!`);
 }

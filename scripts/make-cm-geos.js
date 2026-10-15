@@ -1,5 +1,6 @@
 import { readdirSync } from "fs";
 import geos from "../config/geo-config.js";
+import { dirs } from "../config/paths.js";
 import { readGzip, writeGzip, mkdir } from "./utils.js";
 
 const geoCodes = {};
@@ -55,13 +56,13 @@ function makeCmGeo(feature, geo) {
   };
 }
 
-const outdir = "./output/cm-geos";
+const outdir = dirs.cmGeos;
 
 // Create directory if needed
 mkdir(outdir);
 
 for (const cd of Object.keys(geoCodes)) {
-  const dir = `./output/geos/${cd}`;
+  const dir = `${dirs.geos}/${cd}`;
   const files = readdirSync(dir)
     .filter(f => f.slice(-5) === ".json");
   

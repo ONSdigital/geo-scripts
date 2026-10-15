@@ -6,10 +6,10 @@ import { bbox } from "@turf/turf";
 import { readGzip, writeGzip, csvParse, findPolylabel, round, roundAll, mkdir } from "./utils.js";
 import geos from "../config/geo-config.js";
 import types from "../config/geo-types.js";
+import { dirs, files } from "../config/paths.js";
 
 const startTime = new Date();
 
-const dirs = ["geos", "cm-geos"];
 
 function propsToNames(props, extraCols = []) {
   const newprops = {areacd: props.areacd};
@@ -54,7 +54,7 @@ function makeGeo(geo, year, lookup_data, lookup, census_lookup) {
     const yr = String(year).slice(-2);
     const detail = geo.detail || "bgc";
     const dp = detail === "bfc" ? 6 : detail === "buc" ? 4 : 5;
-    const geo_path = `./input/boundaries/${geo.key}${yr}_${detail}.json.gz`;
+    const geo_path = files.boundary(geo.key, year, detail);
 
     console.log(`Generating geo files from ${geo_path}`);
     const lineReader = new readline(createReadStream(geo_path).pipe(zlib.createGunzip()));
@@ -64,7 +64,7 @@ function makeGeo(geo, year, lookup_data, lookup, census_lookup) {
       const feature = JSON.parse(line);
       const areacd = feature.properties.areacd;
       const typecd = areacd.slice(0, 3);
-      const dir = `./output/geos/${typecd}`;
+      const dir = `${dirs.geos}/${typecd}`;
       const path = `${dir}/${areacd}.json`;
 
       if (!existsSync(path) && geo.codes.includes(typecd)) {
@@ -132,7 +132,7 @@ function makeMergedGeo(props, childcds) {
     const geojson = {type: "FeatureCollection", features: []};
     const ft = [];
     for (const ccd of childcds) {
-      const path = `./output/geos/${ccd.slice(0, 3)}/${ccd}.json`;
+      const path = `${dirs.geos}/${ccd.slice(0, 3)}/${ccd}.json`;
       const feature = JSON.parse(readGzip(path));
       // Keep the child's own properties before overwriting areacd for the dissolve
       ft.push({...feature.properties});
@@ -155,7 +155,7 @@ function makeMergedGeo(props, childcds) {
       props.child_typecds = Array.from(new Set(ft.map(f => f.areacd.slice(0, 3)))).sort((a, b) => a.localeCompare(b));
       props.parents = ft[0].parents;
 
-      const outdir = `./output/geos/${props.areacd.slice(0, 3)}`;
+      const outdir = `${dirs.geos}/${props.areacd.slice(0, 3)}`;
       mkdir(outdir);
 
       const outpath = `${outdir}/${props.areacd}.json`;
@@ -169,7 +169,7 @@ function makeMergedGeo(props, childcds) {
 }
 
 // Load source data
-const lookup_path = "./input/lookups/lookup.csv";
+const lookup_path = files.lookup;
 const lookup_raw = readFileSync(lookup_path, {encoding: 'utf8', flag: 'r'});
 const lookup_data = csvParse(lookup_raw)
   .map(d => ({
@@ -183,15 +183,12 @@ for (const d of lookup_data) lookup[d.areacd] = d;
 // Load census lookups
 const census_lookup = {};
 for (const key of ["oa", "lsoa", "msoa"]) {
-  const path = `./input/lookups/lookup_bestfit_${key}21.json`;
+  const path = files.bestFit(key);
   census_lookup[key] = JSON.parse(readFileSync(path, {encoding: 'utf8', flag: 'r'}));
 }
 
-// Make directories if needed
-for (const dir of dirs) {
-  const path = `./output/${dir}`;
-  mkdir(path);
-}
+// Make output directory if needed
+mkdir(dirs.geos);
 
 // Generate geo files
 for (const geo of geos) {

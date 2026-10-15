@@ -1,11 +1,12 @@
 import { readdirSync } from "fs";
 import LineByLineReader from "line-by-line";
 import { unzip, clearTemp, writeGzip, mkdir } from "./utils.js";
+import { dirs, files } from "../config/paths.js";
 
-const zip_path = "./input/other/nspl.zip";
+const zip_path = files.nspl;
 const temp_dir = "./temp";
 const data_dir = `${temp_dir}/Data`
-const out_dir = "./output/postcodes";
+const out_dir = dirs.postcodes;
 
 const cols = [
   {source: "pcds", target: "cd", type: "string"},

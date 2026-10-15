@@ -4,13 +4,21 @@ import { run, csvParse, mkdir } from "./utils.js";
 import { fetchText, fetchJSON, downloadToFile } from "./lib/http.js";
 import { getLayerInfo, getFeatureCount, queryUrl, resolveFields, checkResponse, ArcGISError } from "./lib/arcgis.js";
 import source_files from "../config/source-files.js";
+import { dirs, yy } from "../config/paths.js";
+import { expandGeoSources } from "./lib/sources.js";
 
-const keys = Object.keys(source_files);
+// Files to download, by input folder
+const sources = {
+  boundaries: expandGeoSources(source_files.boundaries),
+  centroids: expandGeoSources(source_files.centroids),
+  census: source_files.census,
+  other: source_files.other
+};
 
 // Page through a FeatureServer layer, writing features as GeoJSONSeq with
 // properties renamed to areacd/areanm/areanmw. Returns the number of features.
 const downloadGeo = async (file, path) => {
-  const yr = file.name.match(/\d\d/)[0];
+  const yr = yy(file.year);
   const info = await getLayerInfo(file.id);
   const fields = resolveFields(info.fields, file.code, yr);
   const expected = await getFeatureCount(file.id);
@@ -107,10 +115,10 @@ async function downloadFile(key, file, dir) {
 
 async function downloadFiles() {
   const failures = [];
-  for (const key of keys) {
-    const dir = `./input/${key}`;
+  for (const key of Object.keys(sources)) {
+    const dir = dirs[key];
     mkdir(dir);
-    for (const file of source_files[key]) {
+    for (const file of sources[key]) {
       try {
         await downloadFile(key, file, dir);
       } catch (err) {

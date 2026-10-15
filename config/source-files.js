@@ -1,105 +1,168 @@
+// Source files downloaded by scripts/download-files.js.
+//
+// boundaries and centroids come from the ONS Open Geography Portal API, one entry per geography and year:
+//   - key/year match config/geo-config.js, and files are saved as ./input/{boundaries|centroids}/{key}{yy}_{detail}.json.gz
+//   - code is the field prefix in the dataset, eg. "LAD" for LAD25CD, LAD25NM, LAD25NMW (case doesn't matter)
+//   - ids maps each detail level to a Geoportal dataset (service) name
+//
+// Boundaries are needed for every year of every geography. Every detail level is included for
+// the benefit of the vector tiles; BFE files are used for calculating accurate lookups.
+//
+// The Geoportal sometimes retires datasets or replaces them with new versions (eg. "_V2"). Run
+// `npm run check-sources` to check these IDs and to find newly published years.
 export default {
   boundaries: [
-    // These are needed for every version (year) of every geography.
-    // Every detail level is included, for the benefit of creating vector tiles.
-    // BFE files are used for calculating accurate lookups.
-    {name: "ctry22_bfe", id: "Countries_December_2022_UK_BFE", code: "CTRY"},
-    {name: "ctry22_bfc", id: "Countries_December_2022_UK_BFC", code: "CTRY"},
-    {name: "ctry22_bgc", id: "Countries_December_2022_UK_BGC", code: "CTRY"},
-    {name: "ctry22_buc", id: "Countries_December_2022_UK_BUC", code: "CTRY"},
-    {name: "rgn22_bfe", id: "Regions_December_2022_EN_BFE", code: "RGN"},
-    {name: "rgn22_bfc", id: "Regions_December_2022_EN_BFC", code: "RGN"},
-    {name: "rgn22_bgc", id: "Regions_December_2022_EN_BGC", code: "RGN"},
-    {name: "rgn22_buc", id: "Regions_December_2022_EN_BUC", code: "RGN"},
-    {name: "cauth22_bfe", id: "Combined_Authorities_December_2022_EN_BFE", code: "CAUTH"},
-    {name: "cauth22_bfc", id: "Combined_Authorities_December_2022_EN_BFC", code: "CAUTH"},
-    {name: "cauth22_bgc", id: "Combined_Authorities_December_2022_EN_BGC", code: "CAUTH"},
-    {name: "cauth22_buc", id: "Combined_Authorities_December_2022_EN_BUC", code: "CAUTH"},
-    {name: "cauth24_bfe", id: "Combined_Authorities_May_2023_Boundaries_EN_BFE", code: "CAUTH"},
-    {name: "cauth24_bfc", id: "Combined_Authorities_May_2023_Boundaries_EN_BFC", code: "CAUTH"},
-    {name: "cauth24_bgc", id: "Combined_Authorities_May_2023_Boundaries_EN_BGC", code: "CAUTH"},
-    {name: "cauth24_buc", id: "Combined_Authorities_May_2023_Boundaries_EN_BUC", code: "CAUTH"},
-    {name: "cauth25_bfe", id: "CAUTH_MAY_2025_EN_BFE", code: "CAUTH"},
-    {name: "cauth25_bfc", id: "CAUTH_MAY_2025_EN_BFC", code: "CAUTH"},
-    {name: "cauth25_bgc", id: "CAUTH_MAY_2025_EN_BGC", code: "CAUTH"},
-    {name: "cauth25_buc", id: "CAUTH_MAY_2025_EN_BSC", code: "CAUTH"}, // !!! This was BUC in other years !!!
-    {name: "cty22_bfe", id: "Counties_December_2022_EN_BFE", code: "CTY"},
-    {name: "cty22_bfc", id: "Counties_December_2022_EN_BFC", code: "CTY"},
-    {name: "cty22_bgc", id: "Counties_December_2022_EN_BGC", code: "CTY"},
-    {name: "cty22_buc", id: "Counties_December_2022_EN_BUC", code: "CTY"},
-    {name: "cty23_bfe", id: "Counties_May_2023_Boundaries_EN_BFE", code: "CTY"},
-    {name: "cty23_bfc", id: "Counties_May_2023_Boundaries_EN_BFC", code: "CTY"},
-    {name: "cty23_bgc", id: "Counties_May_2023_Boundaries_EN_BGC", code: "CTY"},
-    {name: "cty23_buc", id: "Counties_May_2023_Boundaries_EN_BUC", code: "CTY"},
-    {name: "ltla22_bfe", id: "LAD_DEC_2022_UK_BFE_V2", code: "LAD"},
-    {name: "ltla22_bfc", id: "Local_Authority_Districts_December_2022_Boundaries_UK_BFC", code: "LAD"},
-    {name: "ltla22_bgc", id: "Local_Authority_Districts_December_2022_Boundaries_UK_BGC", code: "LAD"},
-    {name: "ltla22_buc", id: "Local_Authority_Districts_December_2022_Boundaries_UK_BUC", code: "LAD"},
-    {name: "ltla23_bfe", id: "Local_Authority_Districts_May_2023_UK_BFE", code: "LAD"},
-    {name: "ltla23_bfc", id: "Local_Authority_Districts_May_2023_UK_BFC", code: "LAD"},
-    {name: "ltla23_bgc", id: "Local_Authority_Districts_May_2023_UK_BGC", code: "LAD"},
-    {name: "ltla23_buc", id: "Local_Authority_Districts_May_2023_UK_BUC", code: "LAD"},
-    {name: "ltla25_bfe", id: "LAD_MAY_2025_UK_BFE", code: "LAD"},
-    {name: "ltla25_bfc", id: "LAD_MAY_2025_UK_BFC", code: "LAD"},
-    {name: "ltla25_bgc", id: "LAD_MAY_2025_UK_BGC", code: "LAD"},
-    {name: "ltla25_buc", id: "LAD_MAY_2025_UK_BSC", code: "LAD"}, // !!! This was BUC in other years !!!  
-    {name: "wpc22_bfe", id: "PCON_DEC_2022_UK_BFE_V2", code: "PCON"},
-    {name: "wpc22_bfc", id: "Westminster_Parliamentary_Constituencies_Dec_2022_UK_BFC", code: "PCON"},
-    {name: "wpc22_bgc", id: "Westminster_Parliamentary_Constituencies_Dec_2022_UK_BGC", code: "PCON"},
-    {name: "wpc22_buc", id: "Westminster_Parliamentary_Constituencies_Dec_2022_UK_BUC", code: "PCON"},
-    {name: "wpc24_bfe", id: "Westminster_Parliamentary_Constituencies_July_2024_Boundaries_UK_BFE", code: "PCON"},
-    {name: "wpc24_bfc", id: "Westminster_Parliamentary_Constituencies_July_2024_Boundaries_UK_BFC", code: "PCON"},
-    {name: "wpc24_bgc", id: "Westminster_Parliamentary_Constituencies_July_2024_Boundaries_UK_BGC", code: "PCON"},
-    {name: "wpc24_buc", id: "Westminster_Parliamentary_Constituencies_July_2024_Boundaries_UK_BUC", code: "PCON"},
-    {name: "sener22_bfe", id: "Senedd_Cymru_Electoral_Regions_December_2022_WA_BFE", code: "SENER"},
-    {name: "sener22_bfc", id: "Senedd_Cymru_Electoral_Regions_December_2022_WA_BFC", code: "SENER"},
-    {name: "sener22_bgc", id: "Senedd_Cymru_Electoral_Regions_December_2022_WA_BGC", code: "SENER"},
-    {name: "sener22_buc", id: "Senedd_Cymru_Electoral_Regions_December_2022_WA_BUC", code: "SENER"},
-    {name: "senc22_bfe", id: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BFE", code: "SENC"},
-    {name: "senc22_bfc", id: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BFC", code: "SENC"},
-    {name: "senc22_bgc", id: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BGC", code: "SENC"},
-    {name: "senc22_buc", id: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BUC", code: "SENC"},
-    {name: "par22_bfe", id: "Parishes_Decemeber_2022_EW_BFE", code: "PAR"},
-    {name: "par22_bfc", id: "Parishes_December_2022_EW_BFC", code: "PAR"},
-    {name: "par22_bgc", id: "Parishes_December_2022_EW_BGC", code: "PAR"},
-    {name: "par22_bsc", id: "Parishes_December_2022_EW_BSC", code: "PAR"},
-    {name: "wd22_bfe", id: "Wards_December_2022_Boundaries_GB_BFE", code: "WD"},
-    {name: "wd22_bfc", id: "Wards_December_2022_Boundaries_GB_BFC", code: "WD"},
-    {name: "wd22_bgc", id: "Wards_December_2022_Boundaries_GB_BGC", code: "WD"},
-    {name: "wd22_bsc", id: "Wards_December_2022_Boundaries_GB_BSC", code: "WD"},
-    {name: "wd23_bfe", id: "WD_MAY_2023_UK_BFE", code: "WD"},
-    {name: "wd23_bfc", id: "WD_MAY_2023_UK_BFC", code: "WD"},
-    {name: "wd23_bgc", id: "WD_MAY_2023_UK_BGC", code: "WD"},
-    {name: "wd23_bsc", id: "WD_MAY_2023_UK_BSC", code: "WD"},
-    {name: "wd24_bfe", id: "Wards_May_2024_Boundaries_UK_BFE", code: "WD"},
-    {name: "wd24_bfc", id: "Wards_May_2024_Boundaries_UK_BFC", code: "WD"},
-    {name: "wd24_bgc", id: "Wards_May_2024_Boundaries_UK_BGC", code: "WD"},
-    {name: "wd24_bsc", id: "Wards_May_2024_Boundaries_UK_BSC", code: "WD"},
-    {name: "wd25_bfe", id: "WD_MAY_2025_UK_BFE", code: "WD"},
-    {name: "wd25_bfc", id: "WD_MAY_2025_UK_BFC", code: "WD"},
-    {name: "wd25_bgc", id: "WD_MAY_2025_UK_BGC", code: "WD"},
-    {name: "wd25_bsc", id: "WD_MAY_2025_UK_BSC", code: "WD"},
-    {name: "ttwa11_bfe", id: "Travel_to_Work_Areas_Dec_2011_FEB_in_United_Kingdom_2022", code: "TTWA"},
-    {name: "ttwa11_bfc", id: "Travel_to_Work_Areas_Dec_2011_FCB_in_United_Kingdom_2022", code: "TTWA"},
-    {name: "ttwa11_bgc", id: "Travel_to_Work_Areas_Dec_2011_GCB_in_United_Kingdom_2022", code: "TTWA"},
-    {name: "ttwa11_buc", id: "Travel_to_Work_Areas_Dec_2011_UGCB_in_United_Kingdom_2022", code: "TTWA"},
-    {name: "bua22_bfc", id: "BUA_2022_GB", code: "BUA"},
-    {name: "msoa21_bfe", id: "Middle_Layer_Super_Output_Areas_2021_EW_BFE_V6", code: "MSOA"},
-    {name: "msoa21_bfc", id: "Middle_Layer_Super_Output_Areas_Dec_2021_Boundaries_Full_Clipped_EW_BFC_2022", code: "MSOA"},
-    {name: "msoa21_bgc", id: "MSOA_Dec_2021_Boundaries_Generalised_Clipped_EW_BGC_2022", code: "MSOA"},
-    {name: "msoa21_bsc", id: "MSOA_2021_EW_BSC", code: "MSOA"},
-    {name: "lsoa21_bfe", id: "Lower_Layer_Super_Output_Area_2021_EW_BFE_V8", code: "LSOA"},
-    {name: "lsoa21_bfc", id: "LSOA_Dec_2021_Boundaries_Full_Clipped_EW_BFC_2022", code: "LSOA"},
-    {name: "lsoa21_bgc", id: "LSOA_Dec_2021_Boundaries_Generalised_Clipped_EW_BGC_V2", code: "LSOA"},
-    {name: "lsoa21_bsc", id: "LSOA_2021_EW_BSC", code: "LSOA"},
-    {name: "oa21_bfe", id: "Output_Areas_2021_EW_BFE_V8", code: "OA"},
-    {name: "oa21_bfc", id: "Output_Areas_Dec_2021_Boundaries_Full_Clipped_EW_BFC_2022", code: "OA"},
-    {name: "oa21_bgc", id: "Output_Areas_Dec_2021_Boundaries_Generalised_Clipped_EW_BGC_2022", code: "OA"},
+    {key: "ctry", year: 2022, code: "CTRY", ids: {
+      bfe: "Countries_December_2022_UK_BFE",
+      bfc: "Countries_December_2022_UK_BFC",
+      bgc: "Countries_December_2022_UK_BGC",
+      buc: "Countries_December_2022_UK_BUC",
+    }},
+    {key: "rgn", year: 2022, code: "RGN", ids: {
+      bfe: "Regions_December_2022_EN_BFE",
+      bfc: "Regions_December_2022_EN_BFC",
+      bgc: "Regions_December_2022_EN_BGC",
+      buc: "Regions_December_2022_EN_BUC",
+    }},
+    {key: "cauth", year: 2022, code: "CAUTH", ids: {
+      bfe: "Combined_Authorities_December_2022_EN_BFE",
+      bfc: "Combined_Authorities_December_2022_EN_BFC",
+      bgc: "Combined_Authorities_December_2022_EN_BGC",
+      buc: "Combined_Authorities_December_2022_EN_BUC",
+    }},
+    {key: "cauth", year: 2024, code: "CAUTH", ids: {
+      bfe: "Combined_Authorities_May_2023_Boundaries_EN_BFE",
+      bfc: "Combined_Authorities_May_2023_Boundaries_EN_BFC",
+      bgc: "Combined_Authorities_May_2023_Boundaries_EN_BGC",
+      buc: "Combined_Authorities_May_2023_Boundaries_EN_BUC",
+    }},
+    {key: "cauth", year: 2025, code: "CAUTH", ids: {
+      bfe: "CAUTH_MAY_2025_EN_BFE",
+      bfc: "CAUTH_MAY_2025_EN_BFC",
+      bgc: "CAUTH_MAY_2025_EN_BGC",
+      buc: "CAUTH_MAY_2025_EN_BSC", // BSC used for the BUC slot (no BUC published for this year)
+    }},
+    {key: "cty", year: 2022, code: "CTY", ids: {
+      bfe: "Counties_December_2022_EN_BFE",
+      bfc: "Counties_December_2022_EN_BFC",
+      bgc: "Counties_December_2022_EN_BGC",
+      buc: "Counties_December_2022_EN_BUC",
+    }},
+    {key: "cty", year: 2023, code: "CTY", ids: {
+      bfe: "Counties_May_2023_Boundaries_EN_BFE",
+      bfc: "Counties_May_2023_Boundaries_EN_BFC",
+      bgc: "Counties_May_2023_Boundaries_EN_BGC",
+      buc: "Counties_May_2023_Boundaries_EN_BUC",
+    }},
+    {key: "ltla", year: 2022, code: "LAD", ids: {
+      bfe: "LAD_DEC_2022_UK_BFE_V2",
+      bfc: "Local_Authority_Districts_December_2022_Boundaries_UK_BFC",
+      bgc: "Local_Authority_Districts_December_2022_Boundaries_UK_BGC",
+      buc: "Local_Authority_Districts_December_2022_Boundaries_UK_BUC",
+    }},
+    {key: "ltla", year: 2023, code: "LAD", ids: {
+      bfe: "Local_Authority_Districts_May_2023_UK_BFE",
+      bfc: "Local_Authority_Districts_May_2023_UK_BFC",
+      bgc: "Local_Authority_Districts_May_2023_UK_BGC",
+      buc: "Local_Authority_Districts_May_2023_UK_BUC",
+    }},
+    {key: "ltla", year: 2025, code: "LAD", ids: {
+      bfe: "LAD_MAY_2025_UK_BFE",
+      bfc: "LAD_MAY_2025_UK_BFC",
+      bgc: "LAD_MAY_2025_UK_BGC",
+      buc: "LAD_MAY_2025_UK_BSC", // BSC used for the BUC slot (no BUC published for this year)
+    }},
+    {key: "wpc", year: 2022, code: "PCON", ids: {
+      bfe: "PCON_DEC_2022_UK_BFE_V2",
+      bfc: "Westminster_Parliamentary_Constituencies_Dec_2022_UK_BFC",
+      bgc: "Westminster_Parliamentary_Constituencies_Dec_2022_UK_BGC",
+      buc: "Westminster_Parliamentary_Constituencies_Dec_2022_UK_BUC",
+    }},
+    {key: "wpc", year: 2024, code: "PCON", ids: {
+      bfe: "Westminster_Parliamentary_Constituencies_July_2024_Boundaries_UK_BFE",
+      bfc: "Westminster_Parliamentary_Constituencies_July_2024_Boundaries_UK_BFC",
+      bgc: "Westminster_Parliamentary_Constituencies_July_2024_Boundaries_UK_BGC",
+      buc: "Westminster_Parliamentary_Constituencies_July_2024_Boundaries_UK_BUC",
+    }},
+    {key: "sener", year: 2022, code: "SENER", ids: {
+      bfe: "Senedd_Cymru_Electoral_Regions_December_2022_WA_BFE",
+      bfc: "Senedd_Cymru_Electoral_Regions_December_2022_WA_BFC",
+      bgc: "Senedd_Cymru_Electoral_Regions_December_2022_WA_BGC",
+      buc: "Senedd_Cymru_Electoral_Regions_December_2022_WA_BUC",
+    }},
+    {key: "senc", year: 2022, code: "SENC", ids: {
+      bfe: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BFE",
+      bfc: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BFC",
+      bgc: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BGC",
+      buc: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BUC",
+    }},
+    {key: "par", year: 2022, code: "PAR", ids: {
+      bfe: "Parishes_Decemeber_2022_EW_BFE",
+      bfc: "Parishes_December_2022_EW_BFC",
+      bgc: "Parishes_December_2022_EW_BGC",
+      bsc: "Parishes_December_2022_EW_BSC",
+    }},
+    {key: "wd", year: 2022, code: "WD", ids: {
+      bfe: "Wards_December_2022_Boundaries_GB_BFE",
+      bfc: "Wards_December_2022_Boundaries_GB_BFC",
+      bgc: "Wards_December_2022_Boundaries_GB_BGC",
+      bsc: "Wards_December_2022_Boundaries_GB_BSC",
+    }},
+    {key: "wd", year: 2023, code: "WD", ids: {
+      bfe: "WD_MAY_2023_UK_BFE",
+      bfc: "WD_MAY_2023_UK_BFC",
+      bgc: "WD_MAY_2023_UK_BGC",
+      bsc: "WD_MAY_2023_UK_BSC",
+    }},
+    {key: "wd", year: 2024, code: "WD", ids: {
+      bfe: "Wards_May_2024_Boundaries_UK_BFE",
+      bfc: "Wards_May_2024_Boundaries_UK_BFC",
+      bgc: "Wards_May_2024_Boundaries_UK_BGC",
+      bsc: "Wards_May_2024_Boundaries_UK_BSC",
+    }},
+    {key: "wd", year: 2025, code: "WD", ids: {
+      bfe: "WD_MAY_2025_UK_BFE",
+      bfc: "WD_MAY_2025_UK_BFC",
+      bgc: "WD_MAY_2025_UK_BGC",
+      bsc: "WD_MAY_2025_UK_BSC",
+    }},
+    {key: "ttwa", year: 2011, code: "TTWA", ids: {
+      bfe: "Travel_to_Work_Areas_Dec_2011_FEB_in_United_Kingdom_2022",
+      bfc: "Travel_to_Work_Areas_Dec_2011_FCB_in_United_Kingdom_2022",
+      bgc: "Travel_to_Work_Areas_Dec_2011_GCB_in_United_Kingdom_2022",
+      buc: "Travel_to_Work_Areas_Dec_2011_UGCB_in_United_Kingdom_2022",
+    }},
+    {key: "bua", year: 2022, code: "BUA", ids: {
+      bfc: "BUA_2022_GB",
+    }},
+    {key: "msoa", year: 2021, code: "MSOA", ids: {
+      bfe: "Middle_Layer_Super_Output_Areas_2021_EW_BFE_V6",
+      bfc: "Middle_Layer_Super_Output_Areas_Dec_2021_Boundaries_Full_Clipped_EW_BFC_2022",
+      bgc: "MSOA_Dec_2021_Boundaries_Generalised_Clipped_EW_BGC_2022",
+      bsc: "MSOA_2021_EW_BSC",
+    }},
+    {key: "lsoa", year: 2021, code: "LSOA", ids: {
+      bfe: "Lower_Layer_Super_Output_Area_2021_EW_BFE_V8",
+      bfc: "LSOA_Dec_2021_Boundaries_Full_Clipped_EW_BFC_2022",
+      bgc: "LSOA_Dec_2021_Boundaries_Generalised_Clipped_EW_BGC_V2",
+      bsc: "LSOA_2021_EW_BSC",
+    }},
+    {key: "oa", year: 2021, code: "OA", ids: {
+      bfe: "Output_Areas_2021_EW_BFE_V8",
+      bfc: "Output_Areas_Dec_2021_Boundaries_Full_Clipped_EW_BFC_2022",
+      bgc: "Output_Areas_Dec_2021_Boundaries_Generalised_Clipped_EW_BGC_2022",
+    }},
   ],
   centroids: [
-    {name: "oa21_pwc", id: "Output_Areas_2021_PWC_V3", code: "OA"},
-    {name: "lsoa21_pwc", id: "LLSOA_Dec_2021_PWC_for_England_and_Wales_2022", code: "LSOA"},
-    {name: "msoa21_pwc", id: "Middle_Super_Output_Areas_DEC_2021_EW_PWC", code: "MSOA"},
+    {key: "oa", year: 2021, code: "OA", ids: {
+      pwc: "Output_Areas_2021_PWC_V3",
+    }},
+    {key: "lsoa", year: 2021, code: "LSOA", ids: {
+      pwc: "LLSOA_Dec_2021_PWC_for_England_and_Wales_2022",
+    }},
+    {key: "msoa", year: 2021, code: "MSOA", ids: {
+      pwc: "Middle_Super_Output_Areas_DEC_2021_EW_PWC",
+    }},
   ],
   census: [
     // This is a frozen Census 2021 lookup for interfacing with the Nomis API
@@ -107,6 +170,6 @@ export default {
   ],
   other: [
     {name: "msoa_names.csv", href: "https://houseofcommonslibrary.github.io/msoanames/MSOA-Names-Latest2.csv"},
-    {name: "nspl.zip", href: "https://www.arcgis.com/sharing/rest/content/items/077631e063eb4e1ab43575d01381ec33/data"}
+    {name: "nspl.zip", href: "https://www.arcgis.com/sharing/rest/content/items/077631e063eb4e1ab43575d01381ec33/data"},
   ],
 };

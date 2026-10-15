@@ -2,16 +2,17 @@ import { readFileSync, writeFileSync } from "fs";
 import { csvFormat } from "d3-dsv";
 import { csvParse, mkdir } from "./utils.js";
 import geos from "../config/geo-config.js";
+import { dirs, files } from "../config/paths.js";
 
 // Make lists for ELS and BaCAP
 const filter = {cp: ["E", "W"]};
 const extra = {cp: [{areacd: "K04000001", areanm: "England and Wales"}]};
 const lists = Array.from(new Set(geos.map(g => g.list).flat().filter(l => l)));
 
-const inpath = "./input/lookups/lookup.csv";
+const inpath = files.lookup;
 const data = csvParse(readFileSync(inpath, {encoding: 'utf8', flag: 'r'}));
 
-const outdir = "./output/lists";
+const outdir = dirs.lists;
 mkdir(outdir);
 
 const typecds = {};

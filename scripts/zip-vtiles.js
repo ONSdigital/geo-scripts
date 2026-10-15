@@ -1,7 +1,8 @@
 import { readdirSync, existsSync } from "fs";
 import { run } from "./utils.js";
+import { dirs } from "../config/paths.js";
 
-const dir = "./output/vtiles";
+const dir = dirs.vtiles;
 
 const files = readdirSync(dir);
 

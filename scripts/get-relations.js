@@ -5,12 +5,13 @@ import { booleanPointInPolygon, intersect, area, booleanContains, booleanInterse
 import { csvFormat } from "d3-dsv";
 import { csvParse, getValidBoundariesPath } from "./utils.js";
 import geo_config from "../config/geo-config.js";
+import { files } from "../config/paths.js";
 
 const startTime = new Date();
 
-const data_path = "./input/lookups/lookup_metadata.csv";
-const outpath = "./input/lookups/lookup.csv";
-const cauth_path = "./input/lookups/lookup_cauth.csv";
+const data_path = files.metadata;
+const outpath = files.lookup;
+const cauth_path = files.cauth;
 
 const cols = [
   "areacd", "areanm", "areanmw",
