@@ -7,6 +7,10 @@ import { csvParse, getValidBoundariesPath } from "./utils.js";
 import { bboxIndex } from "./lib/spatial.js";
 import geo_config from "../config/geo-config.js";
 import { files } from "../config/paths.js";
+import { cli, rejectSelection } from "./lib/cli.js";
+
+const {opts} = cli("Usage: npm run get-relations");
+rejectSelection(opts, "the master lookup needs every geography and year in config/geo-config.js");
 
 const startTime = new Date();
 

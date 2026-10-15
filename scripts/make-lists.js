@@ -3,6 +3,11 @@ import { csvFormat } from "d3-dsv";
 import { csvParse, mkdir } from "./utils.js";
 import geos from "../config/geo-config.js";
 import { dirs, files } from "../config/paths.js";
+import { cli, selectGeos } from "./lib/cli.js";
+
+const usage = `Usage: npm run make-lists -- [--geo ltla,wd] [--year 2025]
+  --geo, --year  only write the per-type lists for these geographies/years (the combined place lists are always written)`;
+const {selected} = cli(usage, opts => selectGeos(geos, opts));
 
 // Make lists for ELS and BaCAP
 const filter = {cp: ["E", "W"]};
@@ -44,7 +49,7 @@ for (const list of lists) {
 // Make name/code lists for all area types
 const columns = ["areacd", "areanm"];
 
-for (const geo of geos.filter(g => g.key !== "uk")) {
+for (const geo of selected.filter(g => g.key !== "uk")) {
   for (const year of geo.years) {
     const codes = typecds[geo.key];
     const rows = data.filter(d =>

@@ -1,4 +1,4 @@
-import { readFileSync, createReadStream, writeFileSync } from "fs";
+import { readFileSync, existsSync, createReadStream, writeFileSync } from "fs";
 import zlib from "zlib";
 import readline from "line-by-line";
 import { bbox } from "@turf/turf";
@@ -7,12 +7,17 @@ import { makeCensusLookup, compressCensusCodes } from "./lib/census.js";
 import { pointIndex, pointInBBox, preparePointInPolygon } from "./lib/spatial.js";
 import geo_config from "../config/geo-config.js";
 import { files } from "../config/paths.js";
+import { cli, selectGeos, isSelection } from "./lib/cli.js";
 
 const startTime = new Date();
 
 const geo_keys = ["msoa", "lsoa", "oa"];
 const self_keys = ["ctry", "rgn"] // These non-changing codes can be their own lookups
 const skip_keys = ["uk"]; // Don't do best-fit for UK
+
+const usage = `Usage: npm run get-best-fits -- [--geo ltla,wd]
+  --geo  only recalculate best-fits for these geographies, keeping the rest of the existing lookup files`;
+const {opts, selected} = cli(usage, opts => selectGeos(geo_config, opts, {years: false}));
 
 async function getGeoJSON(path) {
   return new Promise((resolve) => {
@@ -82,14 +87,16 @@ for (const key of geo_keys) {
   const best_fits = {};
   const centroids = await getGeoJSON(files.centroids(key, 2021));
   centroids.index = pointIndex(centroids.features.map(f => f.geometry.coordinates), 0.05);
-  for (const geo of geo_config.filter(g => ![...geo_keys, ...skip_keys].includes(g.key))) {
+  for (const geo of selected.filter(g => ![...geo_keys, ...skip_keys].includes(g.key))) {
     for (const year of geo.years) {
       const path = getValidBoundariesPath(geo.key, `${year}`.slice(-2));
       await getBestFits(path, geo, centroids, census_lookup[key], best_fits, key);
     }
   }
   const outpath = files.bestFit(key);
-  writeFileSync(outpath, JSON.stringify(best_fits));
+  // With a selection, update the selected areas in the existing lookup
+  const existing = isSelection(opts) && existsSync(outpath) ? JSON.parse(readFileSync(outpath, {encoding: 'utf8', flag: 'r'})) : {};
+  writeFileSync(outpath, JSON.stringify({...existing, ...best_fits}));
   console.log(`Wrote ${outpath}!`);
 }
 

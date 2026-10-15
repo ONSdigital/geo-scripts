@@ -3,6 +3,11 @@ import zlib from "zlib";
 import readline from "line-by-line";
 import geos from "../config/geo-config.js";
 import { dirs, files } from "../config/paths.js";
+import { cli, rejectSelection } from "./lib/cli.js";
+import { createTileSplitter } from "./lib/tiles.js";
+
+const {opts} = cli("Usage: npm run make-search-tiles");
+rejectSelection(opts, "search tiles combine every geography");
 import { run, getValidBoundariesPath, writeGzip, clearTemp, mkdir, csvParse } from "./utils.js";
 
 const sources = geos
@@ -57,49 +62,22 @@ function makeGeoJSONTiles(path, yr) {
     console.log(`Making GeoJSON tiles from ${path}...`);
     const lineReader = new readline(path);
 
-    let currentTile;
-
-    function writeTile(tile) {
-      if (tile && tile.json.features.length > 0) {
-        mkdir(tile.dir);
-        writeGzip(tile.path, JSON.stringify(tile.json));
-        console.log(`Wrote ${tile.path}`);
-      }
-    }
+    const splitter = createTileSplitter(({x, y, features}) => {
+      const dir = `${dirs.search(yr)}/${x}`;
+      const path = `${dir}/${y}.json`;
+      mkdir(dir);
+      writeGzip(path, JSON.stringify({type: "FeatureCollection", features}));
+      console.log(`Wrote ${path}`);
+    });
 
     lineReader.on('line', (line) => {
       lineReader.pause();
-
-      if (line.startsWith('{ "type": "FeatureCollection", "properties": { "zoom":')) {
-        writeTile(currentTile);
-        // const z = +line.match(/(?<="zoom":\s)\d+(?=,)/)[0];
-        const x = +line.match(/(?<="x":\s)\d+(?=,)/)[0];
-        const y = +line.match(/(?<="y":\s)\d+(?=\s)/)[0];
-        const dir = `${dirs.search(yr)}/${x}`;
-        const path = `${dir}/${y}.json`;
-        const json = {type: "FeatureCollection", features: []};
-        currentTile = {dir, path, json};
-      }
-
-      let feature;
-
-      try {
-        feature = JSON.parse(line);
-      }
-      catch {
-        // Suppress parsing errors
-      }
-
-      if (feature?.type === "Feature") {
-        currentTile.json.features.push(feature);
-      }
-
+      splitter.line(line);
       lineReader.resume();
     });
 
     lineReader.on("end", async () => {
-      // The last tile has no following header to trigger a write
-      writeTile(currentTile);
+      splitter.end();
       resolve();
     });
   });

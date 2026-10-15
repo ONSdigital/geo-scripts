@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "all-scripts": "npm run download-files && npm run get-metadata && npm run get-relations && npm run make-lists && npm run get-best-fits && npm run make-geos",
+    "test": "node --test \"test/*.test.js\"",
+    "all-scripts": "node ./scripts/run-all.js",
     "download-files": "node ./scripts/download-files.js",
     "get-metadata": "node ./scripts/get-metadata.js",
     "get-relations": "node ./scripts/get-relations.js",

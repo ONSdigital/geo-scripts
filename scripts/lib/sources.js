@@ -14,7 +14,8 @@ const releaseOrder = (p) => p.year * 12 + (p.month ? MONTHS.indexOf(p.month) : 0
 const byVersion = (a, b) => b.version - a.version || a.name.localeCompare(b.name);
 
 // The dataset name prefixes ("families") used for each geography, eg. ltla -> lad,
-// local_authority_districts. Taken from the manifest's own IDs, plus the field code.
+// local_authority_districts. Taken from the manifest's own IDs, plus the field code,
+// so a release under a prefix the manifest has never used won't be found.
 export function familiesByKey(files) {
   const families = {};
   for (const file of files) {

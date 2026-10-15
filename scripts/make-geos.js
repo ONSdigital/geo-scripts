@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, createReadStream } from "fs";
+import { readFileSync, rmSync, createReadStream } from "fs";
 import zlib from "zlib";
 import readline from "line-by-line";
 import mapshaper from "mapshaper";
@@ -7,8 +7,17 @@ import { readGzip, writeGzip, csvParse, findPolylabel, round, roundAll, mkdir } 
 import geos from "../config/geo-config.js";
 import types from "../config/geo-types.js";
 import { dirs, files } from "../config/paths.js";
+import { cli, selectGeos } from "./lib/cli.js";
+
+const usage = `Usage: npm run make-geos -- [--geo ltla,wd] [--clean]
+  --geo    only generate files for these geographies (from config/geo-config.js)
+  --clean  delete existing files for the selected geographies first (removes areas no longer in the lookup)`;
+const {opts, selected} = cli(usage, opts => selectGeos(geos, opts, {years: false}));
 
 const startTime = new Date();
+
+// Areas written so far: each area is written once, from the newest year it appears in
+const written = new Set();
 
 
 function propsToNames(props, extraCols = []) {
@@ -79,7 +88,8 @@ function makeGeo(geo, year, indexes, lookup, census_lookup) {
       const dir = `${dirs.geos}/${typecd}`;
       const path = `${dir}/${areacd}.json`;
 
-      if (!existsSync(path) && geo.codes.includes(typecd)) {
+      if (!written.has(areacd) && geo.codes.includes(typecd)) {
+        written.add(areacd);
         // Make simple props
         const lkp = lookup[areacd];
         const props = propsToNames(
@@ -203,18 +213,24 @@ for (const key of ["oa", "lsoa", "msoa"]) {
   census_lookup[key] = JSON.parse(readFileSync(path, {encoding: 'utf8', flag: 'r'}));
 }
 
-// Make output directory if needed
+// Make output directory if needed, and remove old files if requested
 mkdir(dirs.geos);
+if (opts.clean) {
+  for (const code of selected.flatMap(g => g.codes)) {
+    console.log(`Removing ${dirs.geos}/${code}`);
+    rmSync(`${dirs.geos}/${code}`, {recursive: true, force: true});
+  }
+}
 
 // Generate geo files
-for (const geo of geos) {
+for (const geo of selected) {
   for (let year of [...geo.years].reverse()) {
     await makeGeo(geo, year, indexes, lookup, census_lookup);
   }
 }
 
-// Make England and Wales file
-await makeMergedGeo(
+// Make England and Wales file (from the country files)
+if (selected.some(g => g.key === "ctry")) await makeMergedGeo(
   {areacd: "K04000001", areanm: "England and Wales", areanmw: "Cymru a Lloegr", groupcd: "ew"},
   ["E92000001", "W92000004"]
 );

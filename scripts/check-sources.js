@@ -50,8 +50,8 @@ for (const {file, status, candidates} of problems) {
     "  A newer version is available");
   if (candidates.length === 0) console.log("  No replacement found - search https://geoportal.statistics.gov.uk manually");
   for (const [i, name] of candidates.entries()) {
-    const status = await verify(name, file.code);
-    console.log(`  ${i === 0 ? "suggested:" : "   or:    "} ${name}${status ? `  [${status}]` : ""}`);
+    const check = await verify(name, file.code);
+    console.log(`  ${i === 0 ? "suggested:" : "   or:    "} ${name}${check ? `  [${check}]` : ""}`);
   }
 }
 
@@ -63,8 +63,8 @@ for (const release of releases) {
   console.log(`\n// ${release.key} ${label}`);
   console.log(`{key: "${release.key}", year: ${release.year}, code: "${release.code}", ids: {`);
   for (const [detail, name] of Object.entries(release.ids)) {
-    const status = await verify(name, release.code);
-    console.log(`  ${detail}: "${name}",${status ? ` // ${status}` : ""}`);
+    const check = await verify(name, release.code);
+    console.log(`  ${detail}: "${name}",${check ? ` // ${check}` : ""}`);
   }
   console.log("}},");
 }

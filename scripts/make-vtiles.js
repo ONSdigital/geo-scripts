@@ -1,8 +1,14 @@
-import { existsSync } from "fs";
+import { existsSync, rmSync } from "fs";
 import { run, clearTemp, mkdir } from "./utils.js";
-import geos from "../config/vtiles-config.js";
+import tilesets from "../config/vtiles-config.js";
 import zoom_detail from "../config/vtiles-detail.js";
 import { dirs, files } from "../config/paths.js";
+import { cli, selectTilesets } from "./lib/cli.js";
+
+const usage = `Usage: npm run make-vtiles -- [--geo la,wd] [--year 2025] [--force]
+  --geo, --year  only make these tilesets (keys and years from config/vtiles-config.js)
+  --force        remake tilesets that already exist`;
+const {opts, selected} = cli(usage, opts => selectTilesets(tilesets, opts));
 
 // const maxzoom = 12;
 const dir = dirs.vtiles;
@@ -13,7 +19,7 @@ async function makeTiles(geo) {
   const yr = String(geo.year).slice(-2);
   const outpath = `${dir}/${geo.key}${yr}.mbtiles`;
   outputs.push(outpath);
-  if (!existsSync(outpath)) {
+  if (!existsSync(outpath) || opts.force) {
     const sources = geo.sources ? geo.sources : [geo];
     const minzoom = geo.minzoom ? geo.minzoom : 0;
     const detail = [];
@@ -46,6 +52,7 @@ async function makeTiles(geo) {
 
     for (let step of steps) {
       console.log(`Running ${step.cmd}`);
+      if (opts.force) rmSync(step.output, {force: true});
       if (!existsSync(step.output)) await run(step.cmd);
     }
     console.log(`Wrote ${outpath}`);
@@ -55,7 +62,7 @@ async function makeTiles(geo) {
 }
 
 mkdir(dir);
-for (let geo of geos) {
+for (let geo of selected) {
   await makeTiles(geo);
 }
 

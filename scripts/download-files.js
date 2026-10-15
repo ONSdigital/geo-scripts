@@ -6,13 +6,22 @@ import { getLayerInfo, getFeatureCount, queryUrl, resolveFields, checkResponse, 
 import source_files from "../config/source-files.js";
 import { dirs, yy } from "../config/paths.js";
 import { expandGeoSources } from "./lib/sources.js";
+import { cli, selectGeos, isSelection } from "./lib/cli.js";
+import geo_config from "../config/geo-config.js";
+
+const usage = `Usage: npm run download-files -- [--geo ltla,wd] [--year 2025] [--force]
+  --geo, --year  only download boundaries/centroids for these geographies and years
+                 (other source files are only downloaded when there is no selection)
+  --force        download again even if the file already exists`;
+const {opts, selected} = cli(usage, opts => selectGeos(geo_config, opts));
+const isSelected = (file) => selected.some(g => g.key === file.key && g.years.includes(file.year));
 
 // Files to download, by input folder
 const sources = {
-  boundaries: expandGeoSources(source_files.boundaries),
-  centroids: expandGeoSources(source_files.centroids),
-  census: source_files.census,
-  other: source_files.other
+  boundaries: expandGeoSources(source_files.boundaries).filter(isSelected),
+  centroids: expandGeoSources(source_files.centroids).filter(isSelected),
+  census: isSelection(opts) ? [] : source_files.census,
+  other: isSelection(opts) ? [] : source_files.other
 };
 
 // Page through a FeatureServer layer, writing features as GeoJSONSeq with
@@ -31,7 +40,8 @@ const downloadGeo = async (file, path) => {
     const url = queryUrl(file.id, {offset: received, limit, orderBy: info.objectIdField});
     let geo;
     try {
-      geo = checkResponse(await fetchJSON(url), file.id);
+      // Pages of full-detail polygons can be very large (eg. ~100MB for the four UK countries)
+      geo = checkResponse(await fetchJSON(url, {timeout: 20 * 60_000, retries: 2}), file.id);
       if (!Array.isArray(geo.features)) throw new ArcGISError("Response has no features array", null, file.id);
     } catch (err) {
       // Large pages of detailed polygons can fail, so retry with smaller pages
@@ -99,14 +109,14 @@ const convertGeo = async (raw_path, out_path) => {
 async function downloadFile(key, file, dir) {
   if (["boundaries", "centroids"].includes(key)) {
     const out_path = `${dir}/${file.name}.json.gz`;
-    if (existsSync(out_path)) return console.log(`${out_path} already downloaded`);
+    if (existsSync(out_path) && !opts.force) return console.log(`${out_path} already downloaded`);
     const raw_path = `${dir}/${file.name}.download.jsonl`;
     await downloadGeo(file, raw_path);
     await convertGeo(raw_path, out_path);
     console.log(`Downloaded and transformed ${out_path}`);
   } else {
     const path = `${dir}/${file.name}`;
-    if (existsSync(path)) return console.log(`${path} already downloaded`);
+    if (existsSync(path) && !opts.force) return console.log(`${path} already downloaded`);
     if (key === "census") await downloadLookup(file, path);
     else await downloadToFile(file.href, path);
     console.log(`Downloaded ${path}`);
