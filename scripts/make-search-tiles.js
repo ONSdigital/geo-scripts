@@ -58,15 +58,19 @@ function makeGeoJSONTiles(path, yr) {
 
     let currentTile;
 
+    function writeTile(tile) {
+      if (tile && tile.json.features.length > 0) {
+        mkdir(tile.dir);
+        writeGzip(tile.path, JSON.stringify(tile.json));
+        console.log(`Wrote ${tile.path}`);
+      }
+    }
+
     lineReader.on('line', (line) => {
       lineReader.pause();
-      
+
       if (line.startsWith('{ "type": "FeatureCollection", "properties": { "zoom":')) {
-        if (currentTile && currentTile.json.features.length > 0) {
-          mkdir(currentTile.dir);
-          writeGzip(currentTile.path, JSON.stringify(currentTile.json));
-          console.log(`Wrote ${currentTile.path}`);
-        }
+        writeTile(currentTile);
         // const z = +line.match(/(?<="zoom":\s)\d+(?=,)/)[0];
         const x = +line.match(/(?<="x":\s)\d+(?=,)/)[0];
         const y = +line.match(/(?<="y":\s)\d+(?=\s)/)[0];
@@ -93,6 +97,8 @@ function makeGeoJSONTiles(path, yr) {
     });
 
     lineReader.on("end", async () => {
+      // The last tile has no following header to trigger a write
+      writeTile(currentTile);
       resolve();
     });
   });

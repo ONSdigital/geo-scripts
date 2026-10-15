@@ -84,7 +84,7 @@ function compressCensusCodes(oacds, c_lkp, type) {
     const oa = oas[0];
     let found = false;
     for (const key of types.slice(types.indexOf(typecd) + 1).reverse()) {
-      if (!codes.includes[oa[key]]) {
+      if (!codes.includes(oa[key])) {
         if (oas.filter(d => d[key] === oa[key]).length === c_lkp.counts[oa[key]]) {
           codes.push(oa[key]);
           oas = oas.filter(d => d[key] !== oa[key]);

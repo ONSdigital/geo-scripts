@@ -40,9 +40,13 @@ export async function download(url, dest) {
   return;
 }
 
-export function run(cmd, opts) {
+export function run(cmd, opts = {}) {
+  // Extend rather than replace the environment, so that PATH etc. are kept
+  const env = opts.env ?
+    {...process.env, ...Object.fromEntries(Object.entries(opts.env).map(([k, v]) => [k, String(v)]))} :
+    process.env;
   return new Promise((resolve, reject) => {
-    exec(cmd, opts, (error, stdout, stderr) => {
+    exec(cmd, {maxBuffer: 1024 * 1024 * 64, ...opts, env}, (error, stdout, stderr) => {
       if (error) {
         reject(error);
         return;

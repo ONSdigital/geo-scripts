@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync, createReadStream } from "fs";
+import { existsSync, readFileSync, writeFileSync, createReadStream } from "fs";
 import zlib from "zlib";
 import readline from "line-by-line";
 import { csvFormat } from "d3-dsv";
@@ -80,26 +80,24 @@ function addMSOANames() {
   const msoa_raw = readFileSync(msoa_path, {encoding: 'utf8', flag: 'r'});
   const rows = csvParse(msoa_raw);
   for (const row of rows) {
+    if (!lookup[row.msoa21cd]) continue;
     lookup[row.msoa21cd].hclnm = row.msoa21hclnm;
     if (row.msoa21hclnmw) lookup[row.msoa21cd].hclnmw = row.msoa21hclnmw;
   }
 }
 
-const getKey = (str) => str.match(/[a-z]*(?=\d)/)?.[0];
-const sorted_keys = geo_config.map(g => g.key);
-
-const files = readdirSync(geo_dir)
-  .filter(f => f.slice(-8) === ".json.gz" && f.includes("_bfc"))
-  .sort((a, b) => {
-    return sorted_keys.indexOf(getKey(a)) - sorted_keys.indexOf(getKey(b));
-  });
-const geos = files.map(f => {
-  return {
-    path: f,
-    cd: getKey(f),
-    yr: +f.match(/\d\d/)[0]
-  };
-});
+// Read the BFC file for every configured geography and year, in config order.
+// (Driven by the config rather than the folder contents, so stray files are ignored
+// and missing ones are reported up front.)
+const geos = geo_config.flatMap(g => g.years.map(year => {
+  const yr = year % 100;
+  return {path: `${g.key}${String(yr).padStart(2, "0")}_bfc.json.gz`, cd: g.key, yr};
+}));
+const missing = geos.filter(g => !existsSync(`${geo_dir}/${g.path}`));
+if (missing.length > 0) {
+  console.error(`Missing boundary files (run download-files first):\n${missing.map(g => `  ${geo_dir}/${g.path}`).join("\n")}`);
+  process.exit(1);
+}
 
 for (const geo of geos) {
   await getGeoMetadata(geo);

@@ -3,7 +3,7 @@ import zlib from "zlib";
 import readline from "line-by-line";
 import mapshaper from "mapshaper";
 import { bbox } from "@turf/turf";
-import { readGzip, writeGzip, csvParse, findPolylabel, roundAll, mkdir } from "./utils.js";
+import { readGzip, writeGzip, csvParse, findPolylabel, round, roundAll, mkdir } from "./utils.js";
 import geos from "../config/geo-config.js";
 import types from "../config/geo-types.js";
 
@@ -72,7 +72,7 @@ function makeGeo(geo, year, lookup_data, lookup, census_lookup) {
         const lkp = lookup[areacd];
         const props = propsToNames(
           lkp,
-          ["bounds", "centroid", "area_km2", "start", "end"]
+          ["bounds", "centroid", "areakm2", "start", "end"]
         );
 
         // Add additional props
@@ -130,26 +130,29 @@ function makeMergedGeo(props, childcds) {
   return new Promise((resolve) => {
     console.log(`Creating merged geography ${props.areanm} (${props.areacd}) from ${childcds.join(", ")}`);
     const geojson = {type: "FeatureCollection", features: []};
+    const ft = [];
     for (const ccd of childcds) {
       const path = `./output/geos/${ccd.slice(0, 3)}/${ccd}.json`;
       const feature = JSON.parse(readGzip(path));
-      feature.properties.areacd = props.areacd;
+      // Keep the child's own properties before overwriting areacd for the dissolve
+      ft.push({...feature.properties});
+      feature.properties = {areacd: props.areacd};
       geojson.features.push(feature);
     }
 
     mapshaper.applyCommands("-i input.geojson -dissolve2 fields=areacd -o output.geojson", {"input.geojson": geojson}, (err, output) => {
+      if (err) throw err;
       const merged = JSON.parse(output["output.geojson"]).features[0];
-      
-      const ft = geojson.features.map(f => f.properties);
+
       if (!props.groupcd) props.groupcd = null;
       if (!props.groupnm) props.groupnm = props.areanm.toLowerCase();
       props.typecd = props.areacd.slice(0, 3);
       if (!props.typenm) props.typenm = props.areanm.toLowerCase();
-      props.areakm2 = ft.reduce((a, b) => a.areakm2 + b.areakm2, 0);
+      props.areakm2 = round(ft.reduce((sum, f) => sum + (f.areakm2 || 0), 0), 4);
       props.bounds = bbox(merged);
       props.centroid = roundAll(findPolylabel(merged));
       props.children = ft.map(f => propsToNames(f));
-      props.child_typecds = ft.map(f => propsToNames(f));
+      props.child_typecds = Array.from(new Set(ft.map(f => f.areacd.slice(0, 3)))).sort((a, b) => a.localeCompare(b));
       props.parents = ft[0].parents;
 
       const outdir = `./output/geos/${props.areacd.slice(0, 3)}`;

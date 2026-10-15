@@ -10,10 +10,10 @@ import { csvParse, makeLookup } from "./utils.js";
 const areas = csvParse(readFileSync("./input/lookups/lookup.csv", {encoding: 'utf8', flag: 'r'}));
 const areas_lookup = makeLookup(areas);
 
-const codes_raw = readFileSync("./input/oas/oa21_lsoa21_msoa21_ltla22.csv", {encoding: 'utf8', flag: 'r'});
+const codes_raw = readFileSync("./input/census/oa21_lsoa21_msoa21_ltla22.csv", {encoding: 'utf8', flag: 'r'});
 const oa_data = csvParse(
   codes_raw,
-  d => ({areacd: d.oa21cd, parentcd: d.lsoa21cd, msoa: d.msoa21cd, area: areas_lookup[d.oa21cd].km2_clipped})
+  d => ({areacd: d.oa21cd, parentcd: d.lsoa21cd, msoa: d.msoa21cd, area: areas_lookup[d.oa21cd].areakm2})
 );
 console.log("Loaded OA data");
 

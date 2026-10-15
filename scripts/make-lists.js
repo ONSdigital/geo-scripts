@@ -53,7 +53,7 @@ for (const geo of geos.filter(g => g.key !== "uk")) {
     );
 
     const path = `${outdir}/${geo.key}${`${year}`.slice(-2)}.csv`;
-    writeFileSync(path, csvFormat(rows, columns.filter(c => rows[0][c])));
+    writeFileSync(path, csvFormat(rows, rows.length ? columns.filter(c => rows[0][c]) : columns));
     console.log(`Wrote ${path}`);
   }
 }

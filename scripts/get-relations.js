@@ -180,7 +180,7 @@ for (const d of data) {
     if (!parent_grps.includes(cd)) parent_grps.push(cd);
     p_parents = [
       ...p_parents,
-      ...data_grouped[cd].filter(p => isParent(p, d) && isMatchingYear(p, d)).map(p => p.areacd)
+      ...(data_grouped[cd] || []).filter(p => isParent(p, d) && isMatchingYear(p, d)).map(p => p.areacd)
     ];
   }
   if (p_parents.length === 1) {
@@ -213,7 +213,7 @@ for (const d of data) {
     for (const cd of lookup[grp].siblings) {
       p_successors = [
         ...p_successors,
-        ...data_grouped[cd].filter(s => isNextYear(s, d) && isParent(s, d)).map(s => s.areacd)
+        ...(data_grouped[cd] || []).filter(s => isNextYear(s, d) && isParent(s, d)).map(s => s.areacd)
       ];
     }
     if (p_successors.length === 1) {
