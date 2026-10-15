@@ -20,7 +20,8 @@ export class ArcGISError extends Error {
 // The API reports errors with an HTTP 200 and an {"error": {...}} body
 export function checkResponse(json, id) {
   if (json?.error) {
-    const {code, message = "Unknown error", details = []} = json.error;
+    const {code, details = []} = json.error;
+    const message = json.error.message || "Unknown error";
     const extra = details.filter(d => d !== message);
     const err = new ArcGISError(`${message}${extra.length ? ` (${extra.join("; ")})` : ""}`, code, id);
     if (err.unavailable) {
@@ -113,6 +114,8 @@ export function parseServiceName(name) {
     year: +lower[yearIndex],
     detail: detailToken ? DETAILS[detailToken] : null,
     version: versionToken ? +versionToken.slice(1) : 0,
+    // Plural/singular forms are used interchangeably, eg. Output_Area(s)
+    familyKey: lower.slice(0, familyEnd).map(t => t.replace(/s$/, "")).join("_"),
     // Variants with extra fields (eg. rural-urban classification) or names-and-codes tables
     variant: rest.includes("ruc") || rest.includes("nc")
   };

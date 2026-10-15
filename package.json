@@ -19,6 +19,7 @@
     "make-postcodes": "node ./scripts/make-postcodes.js",
     "make-search-tiles": "node ./scripts/make-search-tiles.js",
     "zip-vtiles": "node ./scripts/zip-vtiles.js",
+    "check-sources": "node ./scripts/check-sources.js",
     "check-centroids": "node ./scripts/check-centroids.js"
   },
   "author": "Ahmad Barclay",
