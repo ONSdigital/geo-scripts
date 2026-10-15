@@ -51,6 +51,14 @@ export function writeGzip(path, data) {
   fs.writeFileSync(path, zlib.gzipSync(data));
 }
 
+// Gzip a file, keeping its filename (skipped if it's already gzipped)
+export function gzipInPlace(path) {
+  const data = fs.readFileSync(path);
+  if (data[0] === 0x1f && data[1] === 0x8b) return false;
+  writeGzip(path, data);
+  return true;
+}
+
 export function round(num, dp = 6) {
   let multiplier = Math.pow(10, dp);
   return Math.round(num * multiplier) / multiplier;

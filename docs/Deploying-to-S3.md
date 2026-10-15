@@ -15,11 +15,13 @@ This only works if every file gets the right headers:
 | [Postcode lookup files](Postcode-lookup-files.md) | `output/postcodes/` | Yes | `application/json` | `gzip` |
 | [GeoJSON search tiles](GeoJSON-tiles.md) | `output/search{yy}/` | Yes | `application/json` | `gzip` |
 | [Vector tiles](Vector-tiles.md) (`.pbf`) | unzipped from `output/vtiles/*.zip` | Yes | `application/x-protobuf` | `gzip` |
-| Vector tile `metadata.json` | as above | **No** | `application/json` | *(none)* |
+| Vector tile `metadata.json` | as above | Yes* | `application/json` | `gzip` |
+
+\* `zip-vtiles` gzips each tileset's `metadata.json`, keeping its name. ZIPs made before this was added contain a plain `metadata.json`. Check with `xxd` (see below) and upload those without `Content-Encoding`.
 
 Two common mistakes:
 - **Missing `Content-Encoding`.** Clients receive compressed bytes they can't read.
-- **`Content-Encoding: gzip` on a file that isn't gzipped,** such as a tileset's `metadata.json`, a CSV or a ZIP. Clients fail to decompress it.
+- **`Content-Encoding: gzip` on a file that isn't gzipped,** such as an older plain `metadata.json`, a CSV or a ZIP. Clients fail to decompress it.
 
 Area lists (`output/lists/`) and the master lookup are published on GitHub, not on S3.
 
@@ -75,7 +77,7 @@ aws s3 cp output/search25 "$BUCKET/area-lookup/v2" --recursive \
 
 ### Vector tiles
 
-`npm run zip-vtiles` turns each `.mbtiles` file into a ZIP of `{z}/{x}/{y}.pbf` tiles plus a `metadata.json`. Unzip the tileset you want, then upload the tiles and the metadata separately so that each gets the right headers:
+`npm run zip-vtiles` turns each `.mbtiles` file into a ZIP of `{z}/{x}/{y}.pbf` tiles plus a gzipped `metadata.json`. Unzip the tileset you want, then upload the tiles and the metadata separately so that each gets the right content type:
 
 ```bash
 unzip output/vtiles/wd25.zip -d temp/upload
@@ -85,8 +87,9 @@ aws s3 cp temp/upload/wd25 "$TILES" --recursive \
   --exclude "*" --include "*.pbf" \
   --content-type "application/x-protobuf" --content-encoding "gzip" --cache-control "$CACHE"
 
+xxd -l2 -p temp/upload/wd25/metadata.json  # should be 1f8b; if not, drop --content-encoding below
 aws s3 cp temp/upload/wd25/metadata.json "$TILES/metadata.json" \
-  --content-type "application/json" --cache-control "$CACHE"
+  --content-type "application/json" --content-encoding "gzip" --cache-control "$CACHE"
 ```
 
 Existing tilesets were uploaded with `Content-Type: text/pbf`. Map libraries such as MapLibre read either type.
@@ -105,7 +108,7 @@ If `Content-Encoding` is `gzip`, the first bytes should be `1f8b`. If they're an
 
 ## Fixing headers on files already in S3
 
-You can change an object's headers by copying it onto itself with `--metadata-directive REPLACE`. Every header must be given again, because this replaces them all. For example, to remove the incorrect `Content-Encoding: gzip` from a tileset's `metadata.json`:
+You can change an object's headers by copying it onto itself with `--metadata-directive REPLACE`. Every header must be given again, because this replaces them all. For example, to remove the incorrect `Content-Encoding: gzip` from a plain (not gzipped) `metadata.json`. Alternatively, upload a gzipped copy over it with the commands above:
 
 ```bash
 aws s3 cp "$TILES/metadata.json" "$TILES/metadata.json" --metadata-directive REPLACE \
