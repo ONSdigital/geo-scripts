@@ -37,6 +37,8 @@ const downloadGeo = async (file, path) => {
   let received = 0;
   writeFileSync(path, "");
   while (received < expected) {
+    // Never ask for more than remain, so halving the page size takes effect straight away
+    limit = Math.min(limit, expected - received);
     const url = queryUrl(file.id, {offset: received, limit, orderBy: info.objectIdField});
     let geo;
     try {
