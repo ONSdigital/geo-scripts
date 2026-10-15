@@ -3,7 +3,8 @@ import { fetchJSON } from "./http.js";
 
 export const SERVICES_URL = "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services";
 
-export const layerUrl = (id) => `${SERVICES_URL}/${encodeURIComponent(id)}/FeatureServer/0`;
+export const serviceUrl = (id) => `${SERVICES_URL}/${encodeURIComponent(id)}/FeatureServer`;
+export const layerUrl = (id, layer = 0) => `${serviceUrl(id)}/${layer}`;
 
 export class ArcGISError extends Error {
   constructor(message, code, id) {
@@ -33,16 +34,34 @@ export function checkResponse(json, id) {
   return json;
 }
 
-export async function getLayerInfo(id) {
-  return checkResponse(await fetchJSON(`${layerUrl(id)}?f=json`), id);
+// Pick the layer to use from a FeatureServer's service info. Geoportal datasets have a
+// single layer, which is usually (but not always) layer 0, eg. some use layer 1 or 10.
+export function pickLayer(service, id) {
+  const layers = service.layers || [];
+  if (layers.length !== 1) {
+    const found = layers.map(l => `${l.id} (${l.name})`).join(", ");
+    const err = new ArcGISError(`Expected one layer in "${id}" but found ${layers.length}${found ? `: ${found}` : ""}`, null, id);
+    err.retryable = false;
+    throw err;
+  }
+  return layers[0].id;
 }
 
-export async function getFeatureCount(id) {
-  const json = checkResponse(await fetchJSON(`${layerUrl(id)}/query?where=1%3D1&returnCountOnly=true&f=json`), id);
+// The id of the dataset's layer, from the FeatureServer's list of layers
+export async function getLayerId(id) {
+  return pickLayer(checkResponse(await fetchJSON(`${serviceUrl(id)}?f=json`), id), id);
+}
+
+export async function getLayerInfo(id, layer = 0) {
+  return checkResponse(await fetchJSON(`${layerUrl(id, layer)}?f=json`), id);
+}
+
+export async function getFeatureCount(id, layer = 0) {
+  const json = checkResponse(await fetchJSON(`${layerUrl(id, layer)}/query?where=1%3D1&returnCountOnly=true&f=json`), id);
   return json.count;
 }
 
-export function queryUrl(id, {offset = 0, limit = 2000, orderBy} = {}) {
+export function queryUrl(id, {layer = 0, offset = 0, limit = 2000, orderBy} = {}) {
   const params = new URLSearchParams({
     where: "1=1",
     outFields: "*",
@@ -53,7 +72,7 @@ export function queryUrl(id, {offset = 0, limit = 2000, orderBy} = {}) {
   });
   // Paging is only guaranteed to be stable with an explicit order
   if (orderBy) params.set("orderByFields", orderBy);
-  return `${layerUrl(id)}/query?${params}`;
+  return `${layerUrl(id, layer)}/query?${params}`;
 }
 
 // Map the dataset's {CODE}{YY}CD/NM/NMW fields to areacd/areanm/areanmw.

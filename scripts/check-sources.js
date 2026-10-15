@@ -11,7 +11,7 @@
 // the Geoportal are inconsistent, so always check a suggestion before using it.
 import { parseArgs } from "util";
 import source_files from "../config/source-files.js";
-import { listServices, getLayerInfo, resolveFields, parseServiceName } from "./lib/arcgis.js";
+import { listServices, getLayerId, getLayerInfo, getFeatureCount, resolveFields, parseServiceName } from "./lib/arcgis.js";
 import { expandGeoSources, checkManifest, findNewReleases } from "./lib/sources.js";
 import { yy } from "../config/paths.js";
 
@@ -26,24 +26,40 @@ console.log("Fetching the list of Geoportal datasets...");
 const catalogue = await listServices();
 console.log(`Found ${catalogue.length.toLocaleString()} datasets.\n`);
 
-// Check that a dataset exists and has a {CODE}{YY}CD field
+// Check that a dataset exists, has a {CODE}{YY}CD field and isn't empty
 const verified = new Map();
 async function verify(id, code) {
   if (args["no-verify"]) return "";
   if (!verified.has(id)) {
     const year = parseServiceName(id)?.year;
-    verified.set(id, getLayerInfo(id)
-      .then(info => {
-        resolveFields(info.fields, code, yy(year));
-        return "fields OK";
+    verified.set(id, getLayerId(id)
+      .then(async layer => {
+        resolveFields((await getLayerInfo(id, layer)).fields, code, yy(year));
+        const count = await getFeatureCount(id, layer);
+        if (count === 0) return "NOT USABLE: published with no features";
+        return `OK, ${count.toLocaleString()} features${layer === 0 ? "" : ` (layer ${layer})`}`;
       })
       .catch(err => `NOT USABLE: ${err.message.split(". ")[0]}`));
   }
   return verified.get(id);
 }
 
+// Whether a dataset can be downloaded, by asking the API directly
+async function isAvailable(id) {
+  try {
+    return await getFeatureCount(id, await getLayerId(id)) > 0;
+  } catch {
+    return false;
+  }
+}
+
 // 1. Existing manifest entries
 const results = checkManifest(files, catalogue);
+// The catalogue listing isn't always complete, so confirm that "missing" datasets
+// really are unavailable before reporting them
+for (const result of results.filter(r => r.status === "missing")) {
+  if (await isAvailable(result.file.id)) result.status = "ok";
+}
 const problems = results.filter(r => r.status !== "ok");
 console.log(`== Manifest: ${results.length - problems.length} of ${results.length} dataset IDs are current ==`);
 for (const {file, status, candidates} of problems) {

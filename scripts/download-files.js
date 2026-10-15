@@ -2,7 +2,7 @@ import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync } from "f
 import { csvFormat } from "d3-dsv";
 import { run, csvParse, mkdir } from "./utils.js";
 import { fetchText, fetchJSON, downloadToFile } from "./lib/http.js";
-import { getLayerInfo, getFeatureCount, queryUrl, resolveFields, checkResponse, ArcGISError } from "./lib/arcgis.js";
+import { getLayerId, getLayerInfo, getFeatureCount, queryUrl, resolveFields, checkResponse, ArcGISError } from "./lib/arcgis.js";
 import source_files from "../config/source-files.js";
 import { dirs, yy } from "../config/paths.js";
 import { expandGeoSources } from "./lib/sources.js";
@@ -28,9 +28,12 @@ const sources = {
 // properties renamed to areacd/areanm/areanmw. Returns the number of features.
 const downloadGeo = async (file, path) => {
   const yr = yy(file.year);
-  const info = await getLayerInfo(file.id);
+  const layer = await getLayerId(file.id);
+  const info = await getLayerInfo(file.id, layer);
   const fields = resolveFields(info.fields, file.code, yr);
-  const expected = await getFeatureCount(file.id);
+  const expected = await getFeatureCount(file.id, layer);
+  // Some datasets are published empty (eg. Wards_December_2024_Boundaries_UK_BSC)
+  if (expected === 0) throw new Error(`Dataset "${file.id}" has no features - it may have been published empty, so use another dataset`);
   console.log(`Downloading ${expected.toLocaleString()} features from ${file.id}`);
 
   let limit = Math.min(2000, info.maxRecordCount || 2000);
@@ -39,7 +42,7 @@ const downloadGeo = async (file, path) => {
   while (received < expected) {
     // Never ask for more than remain, so halving the page size takes effect straight away
     limit = Math.min(limit, expected - received);
-    const url = queryUrl(file.id, {offset: received, limit, orderBy: info.objectIdField});
+    const url = queryUrl(file.id, {layer, offset: received, limit, orderBy: info.objectIdField});
     let geo;
     try {
       // Pages of full-detail polygons can be very large (eg. ~100MB for the four UK countries)

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseServiceName, resolveFields, checkResponse, queryUrl, ArcGISError } from "../scripts/lib/arcgis.js";
+import { parseServiceName, resolveFields, checkResponse, queryUrl, pickLayer, ArcGISError } from "../scripts/lib/arcgis.js";
 
 test("parseServiceName handles the Geoportal's naming conventions", () => {
   const cases = {
@@ -67,4 +67,19 @@ test("queryUrl pages in a stable order", () => {
   assert.equal(url.searchParams.get("resultRecordCount"), "1000");
   assert.equal(url.searchParams.get("orderByFields"), "FID");
   assert.equal(url.searchParams.get("outSR"), "4326");
+});
+
+test("pickLayer uses the service's only layer, whatever its id", () => {
+  assert.equal(pickLayer({layers: [{id: 0, name: "WD_MAY_2026_UK_BGC"}]}, "X"), 0);
+  assert.equal(pickLayer({layers: [{id: 10, name: "WD_DEC_24_UK_BSC"}]}, "X"), 10);
+});
+
+test("pickLayer rejects services without exactly one layer", () => {
+  assert.throws(() => pickLayer({layers: []}, "X"), (err) => /Expected one layer in "X" but found 0/.test(err.message) && !err.retryable);
+  assert.throws(() => pickLayer({layers: [{id: 0, name: "a"}, {id: 1, name: "b"}]}, "X"), /found 2: 0 \(a\), 1 \(b\)/);
+});
+
+test("queryUrl targets the given layer", () => {
+  assert.match(queryUrl("Wards_December_2024_Boundaries_UK_BSC", {layer: 10}), /\/FeatureServer\/10\/query\?/);
+  assert.match(queryUrl("WD_MAY_2026_UK_BGC"), /\/FeatureServer\/0\/query\?/);
 });
