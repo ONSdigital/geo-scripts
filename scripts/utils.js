@@ -1,4 +1,3 @@
-import https from "https";
 import fs from "fs";
 import zlib from "zlib";
 import { area, booleanPointInPolygon } from "@turf/turf";
@@ -15,29 +14,6 @@ export function makeLookup(data, key = "areacd") {
   const lookup = {};
   data.forEach(d => lookup[d[key]] = d);
   return lookup;
-}
-
-export function fetch(url) {
-  return new Promise((resolve) => {
-    https.get(url, (response) => {
-      let data = "";
-      response.on("data", (chunk) => {
-        data += chunk;
-      });
-      response.on("end", () => {
-        resolve(data);
-      });
-    })
-    .on("error", (err) => {
-      console.log("Error: " + err.message);
-    });
-  });
-}
-
-export async function download(url, dest) {
-  await run(`curl -L -o "${dest}" "${url}"`);
-  console.log(`Downloaded ${dest}`);
-  return;
 }
 
 export function run(cmd, opts = {}) {
