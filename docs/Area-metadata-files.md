@@ -31,6 +31,7 @@ The files are generated using [ONS Open Geography Portal](https://geoportal.stat
     "areanmw": string, // Welsh name (only for areas in Wales)
     "hclnm": string, // Commons Library name (only for MSOAs)
     "hclnmw": string, // Commons Library Welsh name (only for MSOAs in Wales)
+    "areakm2": number, // Area in square kilometres (clipped to the coastline)
     "bounds": [number, number, number, number], // Bounding box of area polygon
     "centroid": [number, number], // Centroid (pole of inaccessibility)
     "groupcd": string, // eg. "ltla"

@@ -15,3 +15,6 @@ The outputs below are organised by file type. The generated files cover a broad 
 
 **PBF format**
 - [Vector tiles](Vector-tiles.md) (for web maps)
+
+**Deployment**
+- [Deploying to S3](Deploying-to-S3.md) (upload commands and headers for the gzipped outputs)
