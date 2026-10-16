@@ -35,8 +35,10 @@ export default {
       buc: "Combined_Authorities_December_2022_EN_BUC",
     }},
     {key: "cauth", year: 2024, code: "CAUTH", ids: {
+      // The "May_2023" datasets contain 2024 boundaries (CAUTH24CD); the May 2023 BFC
+      // has been retired, so the BFC comes from the May 2024 release (same areas)
       bfe: "Combined_Authorities_May_2023_Boundaries_EN_BFE",
-      bfc: "Combined_Authorities_May_2023_Boundaries_EN_BFC",
+      bfc: "Combined_Authorities_May_2024_Boundaries_EN_BFC",
       bgc: "Combined_Authorities_May_2023_Boundaries_EN_BGC",
       buc: "Combined_Authorities_May_2023_Boundaries_EN_BUC",
     }},
@@ -109,7 +111,7 @@ export default {
       bsc: "Parishes_December_2022_EW_BSC",
     }},
     {key: "wd", year: 2022, code: "WD", ids: {
-      bfe: "Wards_December_2022_Boundaries_GB_BFE",
+      bfe: "Wards_December_2022_Boundaries_GB_BFE", // No longer on the Geoportal: use the archived copy
       bfc: "Wards_December_2022_Boundaries_UK_BFC",
       bgc: "Wards_December_2022_Boundaries_UK_BGC",
       bsc: "Wards_December_2022_Boundaries_UK_BSC",
@@ -121,9 +123,11 @@ export default {
       bsc: "Wards_December_2023_Boundaries_UK_BSC",
     }},
     {key: "wd", year: 2024, code: "WD", ids: {
-      bfe: "Wards_May_2024_Boundaries_UK_BFE",
-      bfc: "Wards_May_2024_Boundaries_UK_BFC",
-      bgc: "Wards_May_2024_Boundaries_UK_BGC",
+      // December 2024, the latest 2024 release, except for the BSC: the December one
+      // was published empty, so it comes from May 2024 (same codes)
+      bfe: "Wards_December_2024_Boundaries_UK_BFE",
+      bfc: "Wards_December_2024_Boundaries_UK_BFC",
+      bgc: "Wards_December_2024_Boundaries_UK_BGC",
       bsc: "Wards_May_2024_Boundaries_UK_BSC",
     }},
     {key: "wd", year: 2025, code: "WD", ids: {
@@ -164,7 +168,7 @@ export default {
       pwc: "OA_December_2021_EW_PWC_V4",
     }},
     {key: "lsoa", year: 2021, code: "LSOA", ids: {
-      pwc: "LLSOA_Dec_2021_PWC_for_England_and_Wales_2022",
+      pwc: "LSOA_PopCentroids_EW_2021_V4",
     }},
     {key: "msoa", year: 2021, code: "MSOA", ids: {
       pwc: "MSOA_December_2021_EW_PWC_V2",
