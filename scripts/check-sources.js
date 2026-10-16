@@ -6,9 +6,10 @@
 //
 // Each calendar year should use the most recent release published in that year,
 // since boundaries and codes change at most once a year. A new year is only worth
-// adding if some area codes have changed (eg. mergers or boundary changes), so the
-// codes in each new release are compared with the latest year in lookup.csv, without
-// downloading any boundaries. Releases with the same codes are listed as skipped.
+// adding if some areas have changed: new codes (eg. mergers or boundary changes) or new
+// names (renames keep their code). So the codes and names in each new release are
+// compared with the latest year in lookup.csv, without downloading any boundaries.
+// Releases with the same codes and names are listed as skipped.
 //
 // Suggestions are printed for review, not written to the config: dataset names on
 // the Geoportal are inconsistent, so always check a suggestion before using it.
@@ -17,7 +18,7 @@ import { readFileSync } from "fs";
 import source_files from "../config/source-files.js";
 import geo_config from "../config/geo-config.js";
 import { listServices, getLayerId, getLayerInfo, getFeatureCount, fetchAttributes, resolveFields, parseServiceName } from "./lib/arcgis.js";
-import { expandGeoSources, checkManifest, findNewReleases, codesInYear, compareCodes, datasetsBySize } from "./lib/sources.js";
+import { expandGeoSources, checkManifest, findNewReleases, codesInYear, compareCodes, renamedCodes, datasetsBySize } from "./lib/sources.js";
 import { csvParse } from "./utils.js";
 import { yy, files as paths } from "../config/paths.js";
 
@@ -107,18 +108,18 @@ async function releaseCodes(release) {
 const lookup = csvParse(readFileSync(paths.lookup, {encoding: "utf8"}));
 const lookupNames = new Map(lookup.map(d => [d.areacd, d.areanm]));
 const examples = (codes) => codes.length ? ` (eg. ${codes.slice(0, 3).join(", ")}${codes.length > 3 ? ", ..." : ""})` : "";
-function describe(change, names) {
-  const renamed = [...names].filter(([cd, nm]) => nm && lookupNames.has(cd) && lookupNames.get(cd) !== nm).length;
+function describe(change, renamed, names) {
+  const renames = renamed.slice(0, 3).map(cd => `${cd} ${names.get(cd)}`);
   return [
     `${change.added.length} new codes${examples(change.added)}`,
     `${change.removed.length} ended${examples(change.removed)}`,
-    ...(renamed ? [`${renamed} renamed`] : []),
+    `${renamed.length} renamed${renames.length ? ` (eg. ${renames.join(", ")}${renamed.length > 3 ? ", ..." : ""})` : ""}`,
     ...(change.otherPrefixes.length ? [`ignoring ${change.otherPrefixes.join(", ")}, which aren't configured`] : [])
   ].join("; ");
 }
 
-// The codes each new release is compared with, by geography: the latest configured
-// year at first, then the latest release that's worth adding
+// The codes and names each new release is compared with, by geography: the latest
+// configured year at first, then the latest release that's worth adding
 const baselines = {};
 const skipped = [];
 for (const release of releases) {
@@ -126,7 +127,7 @@ for (const release of releases) {
   const label = `${monthName(release.month)}${release.year}`;
   if (!baselines[release.key]) {
     const year = Math.max(...geo.years);
-    baselines[release.key] = {year, codes: codesInYear(lookup, geo.codes, year)};
+    baselines[release.key] = {year, codes: codesInYear(lookup, geo.codes, year), names: lookupNames};
     if (baselines[release.key].codes.size === 0) {
       console.log(`\nWarning: lookup.csv has no ${release.key} codes for ${year} - run get-metadata and get-relations to compare codes`);
     }
@@ -143,19 +144,22 @@ for (const release of releases) {
   if (release.status === "update") {
     if (codes) {
       const change = compareCodes(codesInYear(lookup, geo.codes, release.year), codes.codes, geo.codes);
-      note = `compared with ${release.year} in lookup.csv: ${describe(change, codes.names)}`;
-      if (release.year === baseline.year) baseline.codes = new Set(codes.codes);
+      const renamed = renamedCodes(lookupNames, codes.names, geo.codes);
+      note = `compared with ${release.year} in lookup.csv: ${describe(change, renamed, codes.names)}`;
+      if (release.year === baseline.year) Object.assign(baseline, {codes: new Set(codes.codes), names: codes.names});
     }
     console.log(`\n// ${release.key} ${release.year}: replace the existing entry with the later ${label} release\n//   ${note}`);
   } else {
     if (codes) {
+      // Worth adding if any areas have new codes or new names
       const change = compareCodes(baseline.codes, codes.codes, geo.codes);
-      if (change.added.length === 0 && change.removed.length === 0) {
-        skipped.push(`${release.key} ${release.year} (${label}): same codes as ${baseline.year}`);
+      const renamed = renamedCodes(baseline.names, codes.names, geo.codes);
+      if (change.added.length === 0 && change.removed.length === 0 && renamed.length === 0) {
+        skipped.push(`${release.key} ${release.year} (${label}): same codes and names as ${baseline.year}`);
         continue;
       }
-      note = `compared with ${baseline.year}: ${describe(change, codes.names)}`;
-      baselines[release.key] = {year: release.year, codes: new Set(codes.codes)};
+      note = `compared with ${baseline.year}: ${describe(change, renamed, codes.names)}`;
+      baselines[release.key] = {year: release.year, codes: new Set(codes.codes), names: codes.names};
     }
     console.log(`\n// ${release.key} ${release.year}: new year (${label} release)\n//   ${note}`);
   }
@@ -170,7 +174,7 @@ for (const release of releases) {
 }
 
 if (skipped.length) {
-  console.log(`\n== Skipped ${skipped.length} new years with no code changes ==`);
+  console.log(`\n== Skipped ${skipped.length} new years with no code or name changes ==`);
   for (const line of skipped) console.log(`  ${line}`);
 }
 if (releases.length > skipped.length) {

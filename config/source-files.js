@@ -10,7 +10,7 @@
 //
 // year is the calendar year. Boundaries and codes change at most once a year, so use the
 // most recent release published in that year (eg. December rather than May, if both exist).
-// Only add a new year if some areas' codes have changed; check-sources checks this.
+// Only add a new year if some areas' codes or names have changed; check-sources checks this.
 //
 // The Geoportal sometimes retires datasets or replaces them with new versions (eg. "_V2"). Run
 // `npm run check-sources` to check these IDs and to find newly published years.

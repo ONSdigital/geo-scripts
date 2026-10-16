@@ -79,6 +79,15 @@ export function compareCodes(before, after, prefixes) {
   };
 }
 
+// Codes (of the given types) whose name differs between two {code: name} maps. Areas
+// can be renamed without getting a new code.
+export function renamedCodes(before, after, prefixes) {
+  return [...after]
+    .filter(([cd, nm]) => prefixes.includes(cd.slice(0, 3)) && nm && before.get(cd) && before.get(cd).trim() !== nm.trim())
+    .map(([cd]) => cd)
+    .sort();
+}
+
 // A release's datasets, quickest to query first (they all have the same attributes)
 export function datasetsBySize(ids) {
   return ["buc", "bsc", "bgc", "bfc", "bfe", "pwc"].filter(d => ids[d]).map(d => ids[d]);

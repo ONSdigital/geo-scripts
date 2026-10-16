@@ -49,7 +49,14 @@ function getGeoMetadata(geo) {
       const feature = JSON.parse(line);
       if (filter.includes(feature.properties.areacd.slice(0, 3))) {
         if (lookup[feature.properties.areacd]) {
-          lookup[feature.properties.areacd].years.push(geo.yr + 2000);
+          const existing = lookup[feature.properties.areacd];
+          existing.years.push(geo.yr + 2000);
+          // Areas can be renamed without a new code. Years are read in order, so this
+          // keeps the latest name.
+          for (const key of ["areanm", "areanmw"]) {
+            const name = feature.properties[key];
+            if (name && name !== " ") existing[key] = name;
+          }
         } else {
           const props = {};
           for (const key of Object.keys(feature.properties)) {

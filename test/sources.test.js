@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { expandGeoSources, checkManifest, findNewReleases, codesInYear, compareCodes, datasetsBySize } from "../scripts/lib/sources.js";
+import { expandGeoSources, checkManifest, findNewReleases, codesInYear, compareCodes, renamedCodes, datasetsBySize } from "../scripts/lib/sources.js";
 
 const manifest = expandGeoSources([
   {key: "ltla", year: 2025, code: "LAD", ids: {
@@ -103,4 +103,10 @@ test("compareCodes finds new and ended codes of the configured types only", () =
 
 test("datasetsBySize lists the quickest datasets to query first", () => {
   assert.deepEqual(datasetsBySize({bfe: "A_BFE", bfc: "A_BFC", bgc: "A_BGC", bsc: "A_BSC"}), ["A_BSC", "A_BGC", "A_BFC", "A_BFE"]);
+});
+
+test("renamedCodes finds areas whose name changed but code didn't", () => {
+  const before = new Map([["E07000083", "Tewkesbury"], ["E07000084", "Basingstoke and Deane"], ["E05000001", "A ward"]]);
+  const after = new Map([["E07000083", "North Gloucestershire"], ["E07000084", "Basingstoke and Deane "], ["E07000999", "New"], ["E05000001", "Renamed ward"]]);
+  assert.deepEqual(renamedCodes(before, after, ["E07"]), ["E07000083"]);
 });
