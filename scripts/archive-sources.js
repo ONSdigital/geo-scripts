@@ -13,6 +13,7 @@ import { run, mkdir } from "./utils.js";
 import { cli, selectGeos, isSelection } from "./lib/cli.js";
 import { expandGeoSources } from "./lib/sources.js";
 import { withRetry } from "./lib/http.js";
+import { readRecord, recordedOtherSource } from "./lib/local-sources.js";
 import { MANIFEST, tagFor, getManifest, sha256File, updateManifest } from "./lib/archive.js";
 
 const usage = `Usage: npm run archive-sources -- [--geo wd] [--year 2025] [--other] [--dry-run]
@@ -37,9 +38,16 @@ const files = [
 ];
 
 const byTag = new Map();
+const record = readRecord();
 for (const file of files) {
   if (!existsSync(file.path)) {
     console.log(`Skipping ${file.path}, which hasn't been downloaded`);
+    continue;
+  }
+  // Don't archive a file under the wrong source (eg. if the config has changed since it was downloaded)
+  const other = recordedOtherSource(record, file.name, file.id || file.href);
+  if (other) {
+    console.log(`Skipping ${file.path}, which was downloaded from ${other}, not ${file.id || file.href} - run download-files first`);
     continue;
   }
   const tag = tagFor(file);

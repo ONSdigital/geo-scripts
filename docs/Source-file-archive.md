@@ -24,6 +24,8 @@ There is one version of each file. When a file is corrected or replaced, the arc
 
 To ignore the archive and download from the Geoportal, add `--source geoportal`.
 
+`download-files` records which dataset each file came from in `input/sources.json`. If `config/source-files.js` is changed to use a different dataset for a file, the file is downloaded again, and an archived copy from a different dataset isn't used. `archive-sources` won't archive a file that was downloaded from a different dataset than the config now lists.
+
 ## Archiving files
 
 To archive files, you need write access to the archive repository and the [GitHub CLI](https://cli.github.com/) installed and logged in (`gh auth login`). Then run:

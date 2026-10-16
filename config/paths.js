@@ -31,6 +31,8 @@ export const files = {
   censusLookup: `${dirs.census}/oa21_lsoa21_msoa21_ltla22.csv`,
   msoaNames: `${dirs.other}/msoa_names.csv`,
   nspl: `${dirs.other}/nspl.zip`,
+  // Which dataset each downloaded source file came from (written by download-files)
+  sourceRecord: "./input/sources.json",
   // Written by get-metadata
   metadata: `${dirs.lookups}/lookup_metadata.csv`,
   names: `${dirs.lookups}/lookup_names.csv`,

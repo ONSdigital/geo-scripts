@@ -7,6 +7,7 @@ node_modules/
 /input/centroids/*
 /input/postcodes/*
 /input/census/*
+/input/sources.json
 !/input/lookups/lookup_bestfit_oa21.json
 !/input/lookups/lookup_bestfit_lsoa21.json
 !/input/lookups/lookup_bestfit_msoa21.json
