@@ -1,5 +1,4 @@
-import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync, createWriteStream } from "fs";
-import readline from "line-by-line";
+import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync } from "fs";
 import { csvFormat } from "d3-dsv";
 import { run, csvParse, mkdir } from "./utils.js";
 import { fetchText, fetchJSON, downloadToFile } from "./lib/http.js";
@@ -11,7 +10,7 @@ import { cli, selectGeos, isSelection } from "./lib/cli.js";
 import geo_config from "../config/geo-config.js";
 import { tagFor, assetUrl, getManifest, sha256File } from "./lib/archive.js";
 import { readRecord, recordDownload, recordedOtherSource } from "./lib/local-sources.js";
-import { fixRings } from "./lib/spatial.js";
+import { cleanFeature, writeCleanFeatures } from "./lib/features.js";
 
 const usage = `Usage: npm run download-files -- [--geo ltla,wd] [--year 2025] [--force] [--source geoportal]
   --geo, --year  only download boundaries/centroids for these geographies and years
@@ -151,42 +150,6 @@ async function downloadFromArchive(file, name, path, source, force) {
   recordDownload(name, source, "archive");
   console.log(`Downloaded ${path} from the archive (${tag})`);
   return true;
-}
-
-// Rename properties to areacd/areanm/areanmw (trimmed, blank names dropped), and repair
-// holes stored as separate polygons (see fixRings)
-function cleanFeature(feature, fields) {
-  const props = {};
-  for (const field of fields) {
-    const value = feature.properties[field.key];
-    const trimmed = typeof value === "string" ? value.trim() : value;
-    if (trimmed) props[field.label] = trimmed;
-  }
-  return {type: "Feature", properties: props, geometry: fixRings(feature.geometry)};
-}
-
-// Read a GeoJSON FeatureCollection written by ogr2ogr (one feature per line) and write
-// cleaned features as GeoJSONSeq. Streams line by line, as some files are several GB.
-// Returns the number of features.
-function writeCleanFeatures(input, output, fields) {
-  return new Promise((resolve, reject) => {
-    const out = createWriteStream(output);
-    const lines = new readline(input);
-    let count = 0;
-    lines.on("line", (line) => {
-      if (!line.startsWith('{ "type": "Feature"')) return;
-      const feature = JSON.parse(line.replace(/,\s*$/, ""));
-      count ++;
-      if (!out.write(`${JSON.stringify(cleanFeature(feature, fields))}\n`)) {
-        lines.pause();
-        out.once("drain", () => lines.resume());
-      }
-    });
-    lines.on("error", reject);
-    lines.on("end", () => out.end());
-    out.on("finish", () => resolve(count));
-    out.on("error", reject);
-  });
 }
 
 // Download a whole dataset as one pre-built GeoJSON file from the Geoportal's download
