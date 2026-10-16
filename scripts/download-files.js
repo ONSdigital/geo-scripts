@@ -65,7 +65,10 @@ const downloadGeo = async (file, path) => {
     appendFileSync(path, `${geo.features.map(feature => {
       const props = {};
       for (const field of fields) {
-        if (feature.properties[field.key]) props[field.label] = feature.properties[field.key];
+        // Trim names, and drop blank ones (eg. " " for a missing Welsh name)
+        const value = feature.properties[field.key];
+        const trimmed = typeof value === "string" ? value.trim() : value;
+        if (trimmed) props[field.label] = trimmed;
       }
       feature.properties = props;
       return JSON.stringify(feature);

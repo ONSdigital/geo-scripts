@@ -47,6 +47,14 @@ function getGeoMetadata(geo) {
     lineReader.on('line', (line) => {
       lineReader.pause();
       const feature = JSON.parse(line);
+      // Trim names, and drop blank ones (source files use " " for a missing Welsh name)
+      for (const key of Object.keys(feature.properties)) {
+        const value = feature.properties[key];
+        if (typeof value === "string") {
+          if (value.trim()) feature.properties[key] = value.trim();
+          else delete feature.properties[key];
+        }
+      }
       if (filter.includes(feature.properties.areacd.slice(0, 3))) {
         if (lookup[feature.properties.areacd]) {
           const existing = lookup[feature.properties.areacd];
@@ -55,13 +63,13 @@ function getGeoMetadata(geo) {
           // keeps the latest name.
           for (const key of ["areanm", "areanmw"]) {
             const name = feature.properties[key];
-            if (name && name !== " ") existing[key] = name;
+            if (name) existing[key] = name;
           }
         } else {
           const props = {};
           for (const key of Object.keys(feature.properties)) {
             // Filter to remove empty props
-            if (feature.properties[key] && feature.properties[key] !== " ") {
+            if (feature.properties[key]) {
               props[key] = feature.properties[key];
             }
           }
