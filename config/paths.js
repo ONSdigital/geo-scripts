@@ -36,9 +36,10 @@ export const files = {
   names: `${dirs.lookups}/lookup_names.csv`,
   // Written by get-relations (the committed master lookup)
   lookup: `${dirs.lookups}/lookup.csv`,
-  cauth: `${dirs.lookups}/lookup_cauth.csv`,
   // Written by get-best-fits (committed)
   bestFit: (key) => `${dirs.lookups}/lookup_bestfit_${key}21.json`,
   // Written by make-oa-vtiles-lookups
-  vtilesLookup: (key) => `${dirs.lookups}/lookup_vtiles_${key}21.csv`
+  vtilesLookup: (key) => `${dirs.lookups}/lookup_vtiles_${key}21.csv`,
+  // Written by make-vtiles, for tilesets with metadata
+  vtilesMetadata: (key, year) => `${dirs.lookups}/lookup_vtiles_${key}${yy(year)}.csv`
 };

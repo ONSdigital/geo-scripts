@@ -1,9 +1,12 @@
-import { existsSync, rmSync } from "fs";
-import { run, clearTemp, mkdir } from "./utils.js";
+import { existsSync, rmSync, readFileSync, writeFileSync } from "fs";
+import { csvFormat } from "d3-dsv";
+import { run, clearTemp, mkdir, csvParse, readGzip, getValidBoundariesPath } from "./utils.js";
 import tilesets from "../config/vtiles-config.js";
 import zoom_detail from "../config/vtiles-detail.js";
-import { dirs, files } from "../config/paths.js";
+import geo_config from "../config/geo-config.js";
+import { dirs, files, yy } from "../config/paths.js";
 import { cli, selectTilesets } from "./lib/cli.js";
+import { preparePolygons, findParents } from "./lib/vtiles.js";
 
 const usage = `Usage: npm run make-vtiles -- [--geo la,wd] [--year 2025] [--force]
   --geo, --year  only make these tilesets (keys and years from config/vtiles-config.js)
@@ -15,12 +18,49 @@ const dir = dirs.vtiles;
 
 let outputs = [];
 
+// Metadata for a tileset version, as a CSV to join to its features by areacd.
+// {flag: "cauth"} sets cauth=true on areas whose parent, in the tileset's year, is one of
+// the tileset's "cauth" areas (eg. local authorities in a combined authority). Parents are
+// found in hierarchy order among the tileset's sources, by which polygon contains an
+// area's centroid, so a district in a county has the county as its parent.
+let lookupCentroids;
+function makeMetadata(tileset) {
+  const {flag} = tileset.metadata;
+  lookupCentroids ||= new Map(csvParse(readFileSync(files.lookup, {encoding: "utf8"}))
+    .map(d => [d.areacd, d.centroid.split("|").map(Number)]));
+
+  const polygonsByType = {};
+  const areas = [];
+  for (const source of tileset.sources) {
+    const geo = geo_config.find(g => g.key === source.key);
+    const features = readGzip(getValidBoundariesPath(source.key, yy(source.year))).trim().split("\n").map(line => JSON.parse(line))
+      .filter(f => geo.codes.includes(f.properties.areacd.slice(0, 3)));
+    for (const polygon of preparePolygons(features)) (polygonsByType[polygon.areacd.slice(0, 3)] ||= []).push(polygon);
+    if (source.key === flag) continue;
+    for (const f of features) {
+      const centroid = lookupCentroids.get(f.properties.areacd);
+      if (centroid) areas.push({areacd: f.properties.areacd, centroid, parentTypes: geo.parents});
+    }
+  }
+
+  const flagCodes = geo_config.find(g => g.key === flag).codes;
+  const rows = [...findParents(areas, polygonsByType)]
+    .filter(([, parentcd]) => flagCodes.includes(parentcd.slice(0, 3)))
+    .map(([areacd]) => ({areacd, [flag]: true}))
+    .sort((a, b) => a.areacd.localeCompare(b.areacd));
+  const path = files.vtilesMetadata(tileset.key, tileset.year);
+  writeFileSync(path, csvFormat(rows, ["areacd", flag]));
+  console.log(`Wrote ${path} (${rows.length} areas with ${flag}=true)`);
+  return path;
+}
+
 async function makeTiles(geo) {
   const yr = String(geo.year).slice(-2);
   const outpath = `${dir}/${geo.key}${yr}.mbtiles`;
   outputs.push(outpath);
   if (!existsSync(outpath) || opts.force) {
     const sources = geo.sources ? geo.sources : [geo];
+    const metadata = geo.metadata ? makeMetadata(geo) : null;
     const minzoom = geo.minzoom ? geo.minzoom : 0;
     const detail = [];
     for (let dtl of ["buc", "bsc", "bgc", "bfc"]) {
@@ -42,12 +82,12 @@ async function makeTiles(geo) {
 
     output = `./temp/${geo.key}${yr}_raw.mbtiles`;
     steps.push({cmd: `tile-join -o ${output} ${steps.map(s => s.output).join(" ")}`, output});
-    output = `${geo.metadata ? "./temp" : dir}/${geo.key}${yr}.mbtiles`;
+    output = `${metadata ? "./temp" : dir}/${geo.key}${yr}.mbtiles`;
     steps.push({cmd: `tile-join -o ${output} -c ${files.names} --empty-csv-columns-are-null --no-tile-size-limit ./temp/${geo.key}${yr}_raw.mbtiles`, output});
 
-    if (geo.metadata) {
+    if (metadata) {
       output = `${dir}/${geo.key}${yr}.mbtiles`;
-      steps.push({cmd: `tile-join -o ${output} -c ${geo.metadata} --empty-csv-columns-are-null --no-tile-size-limit ./temp/${geo.key}${yr}.mbtiles`, output});
+      steps.push({cmd: `tile-join -o ${output} -c ${metadata} --empty-csv-columns-are-null --no-tile-size-limit ./temp/${geo.key}${yr}.mbtiles`, output});
     }
 
     for (let step of steps) {

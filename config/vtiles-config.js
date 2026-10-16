@@ -11,14 +11,16 @@
 //   sources: geographies to combine, each as its own layer (default: just the tileset's
 //            own key, as one layer called "boundaries")
 //   minzoom: lowest zoom level to generate
-//   metadata: extra CSV of attributes to join to the tiles, by areacd
+//   metadata: extra attributes, made for each version. {flag: "cauth"} sets cauth=true on
+//             areas whose parent in that year is one of the tileset's "cauth" areas
 import geo_config from "./geo-config.js";
 
 const tilesets = [
   {
     key: "la",
     sources: [{key: "ltla"}, {key: "cty"}, {key: "cauth"}],
-    metadata: "./input/lookups/lookup_cauth.csv"
+    // Mark local authorities and counties in a combined authority in that year
+    metadata: {flag: "cauth"}
   },
   {key: "ltla", minzoom: 3},
   {key: "wpc", minzoom: 4},

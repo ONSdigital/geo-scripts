@@ -16,7 +16,6 @@ const startTime = new Date();
 
 const data_path = files.metadata;
 const outpath = files.lookup;
-const cauth_path = files.cauth;
 
 const cols = [
   "areacd", "areanm", "areanmw",
@@ -297,14 +296,6 @@ for (const d of data) {
 
 writeFileSync(outpath, csvFormat(data, cols));
 console.log(`Wrote ${outpath}`);
-
-console.log("Making CAUTH lookup...");
-const cauth_lookup = data
-  .filter(d => d?.parentcd?.slice(0, 3) === "E47" && !d.end)
-  .map(d => ({areacd: d.areacd, cauth: true}));
-
-writeFileSync(cauth_path, csvFormat(cauth_lookup));
-console.log(`Wrote ${cauth_path}`);
 
 const endTime = new Date();
 const duration = Math.round((endTime - startTime) / 1000);
