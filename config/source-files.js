@@ -71,10 +71,12 @@ export default {
       buc: "Local_Authority_Districts_May_2023_UK_BUC",
     }},
     {key: "ltla", year: 2025, code: "LAD", ids: {
-      bfe: "LAD_MAY_2025_UK_BFE",
-      bfc: "LAD_MAY_2025_UK_BFC",
-      bgc: "LAD_MAY_2025_UK_BGC",
-      buc: "LAD_MAY_2025_UK_BSC", // BSC used for the BUC slot (no BUC published for this year)
+      // December 2025, the latest 2025 release (the May 2025 release included a proposed
+      // rename of E07000083 Tewkesbury that never took effect)
+      bfe: "Local_Authority_Districts_DEC_2025_Boundaries_UK_BFE",
+      bfc: "Local_Authority_Districts_DEC_2025_Boundaries_UK_BFC",
+      bgc: "Local_Authority_Districts_DEC_2025_Boundaries_UK_BGC",
+      buc: "Local_Authority_Districts_DEC_2025_Boundaries_UK_BUC",
     }},
     {key: "wpc", year: 2022, code: "PCON", ids: {
       bfe: "PCON_DEC_2022_UK_BFE_V2",
