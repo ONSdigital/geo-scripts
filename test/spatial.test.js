@@ -73,3 +73,29 @@ for (const [name, geometry] of Object.entries(geometries)) {
     }
   });
 }
+
+test("fixRings puts holes stored as separate polygons back into their outer ring", async () => {
+  const { fixRings, ringArea } = await import("../scripts/lib/spatial.js");
+  // Esri winding: outer rings clockwise, holes anticlockwise
+  const outer = [[0, 0], [0, 10], [10, 10], [10, 0], [0, 0]];
+  const hole = [[4, 4], [6, 4], [6, 6], [4, 6], [4, 4]];
+  const island = [[20, 20], [20, 22], [22, 22], [22, 20], [20, 20]];
+  const islandInHole = [[4.5, 4.5], [4.5, 5.5], [5.5, 5.5], [5.5, 4.5], [4.5, 4.5]];
+  assert.ok(ringArea(outer) < 0 && ringArea(hole) > 0);
+
+  // A hole returned as a separate polygon (eg. Nottingham in Nottinghamshire)
+  assert.deepEqual(fixRings({type: "MultiPolygon", coordinates: [[outer], [island], [hole]]}),
+    {type: "MultiPolygon", coordinates: [[outer, hole], [island]]});
+  // An island inside the hole stays a separate polygon, and the hole goes in the smallest outer ring around it
+  assert.deepEqual(fixRings({type: "MultiPolygon", coordinates: [[outer], [islandInHole], [hole]]}),
+    {type: "MultiPolygon", coordinates: [[outer, hole], [islandInHole]]});
+  // Correct geometry is unchanged, and a single polygon is returned as a Polygon
+  assert.deepEqual(fixRings({type: "Polygon", coordinates: [outer, hole]}), {type: "Polygon", coordinates: [outer, hole]});
+  assert.deepEqual(fixRings({type: "MultiPolygon", coordinates: [[outer, hole]]}), {type: "Polygon", coordinates: [outer, hole]});
+  // An anticlockwise ring that isn't inside anything is kept as a polygon
+  const reversedIsland = [...island].reverse();
+  assert.deepEqual(fixRings({type: "MultiPolygon", coordinates: [[outer], [reversedIsland]]}),
+    {type: "MultiPolygon", coordinates: [[outer], [reversedIsland]]});
+  // Points and lines are untouched
+  assert.deepEqual(fixRings({type: "Point", coordinates: [1, 2]}), {type: "Point", coordinates: [1, 2]});
+});

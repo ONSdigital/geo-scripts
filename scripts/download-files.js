@@ -1,5 +1,4 @@
 import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync, createWriteStream } from "fs";
-import zlib from "zlib";
 import readline from "line-by-line";
 import { csvFormat } from "d3-dsv";
 import { run, csvParse, mkdir } from "./utils.js";
@@ -12,6 +11,7 @@ import { cli, selectGeos, isSelection } from "./lib/cli.js";
 import geo_config from "../config/geo-config.js";
 import { tagFor, assetUrl, getManifest, sha256File } from "./lib/archive.js";
 import { readRecord, recordDownload, recordedOtherSource } from "./lib/local-sources.js";
+import { fixRings } from "./lib/spatial.js";
 
 const usage = `Usage: npm run download-files -- [--geo ltla,wd] [--year 2025] [--force] [--source geoportal]
   --geo, --year  only download boundaries/centroids for these geographies and years
@@ -65,17 +65,7 @@ const downloadGeo = async (file, path) => {
       continue;
     }
     if (geo.features.length === 0) break;
-    appendFileSync(path, `${geo.features.map(feature => {
-      const props = {};
-      for (const field of fields) {
-        // Trim names, and drop blank ones (eg. " " for a missing Welsh name)
-        const value = feature.properties[field.key];
-        const trimmed = typeof value === "string" ? value.trim() : value;
-        if (trimmed) props[field.label] = trimmed;
-      }
-      feature.properties = props;
-      return JSON.stringify(feature);
-    }).join("\n")}\n`);
+    appendFileSync(path, `${geo.features.map(feature => JSON.stringify(cleanFeature(feature, fields))).join("\n")}\n`);
     received += geo.features.length;
     console.log(`Fetched ${received.toLocaleString()} of ${expected.toLocaleString()} features`);
   }
@@ -163,65 +153,79 @@ async function downloadFromArchive(file, name, path, source, force) {
   return true;
 }
 
-// Write GeoJSONSeq features as gzipped GeoJSONSeq, with properties renamed to
-// areacd/areanm/areanmw (trimmed, blanks dropped) and single-part MultiPolygons as
-// Polygons. Streams line by line, as some files are several GB. Returns the count.
-function writeFeatures(input, output, fields) {
+// Rename properties to areacd/areanm/areanmw (trimmed, blank names dropped), and repair
+// holes stored as separate polygons (see fixRings)
+function cleanFeature(feature, fields) {
+  const props = {};
+  for (const field of fields) {
+    const value = feature.properties[field.key];
+    const trimmed = typeof value === "string" ? value.trim() : value;
+    if (trimmed) props[field.label] = trimmed;
+  }
+  return {type: "Feature", properties: props, geometry: fixRings(feature.geometry)};
+}
+
+// Read a GeoJSON FeatureCollection written by ogr2ogr (one feature per line) and write
+// cleaned features as GeoJSONSeq. Streams line by line, as some files are several GB.
+// Returns the number of features.
+function writeCleanFeatures(input, output, fields) {
   return new Promise((resolve, reject) => {
-    const gzip = zlib.createGzip();
     const out = createWriteStream(output);
-    gzip.pipe(out);
     const lines = new readline(input);
     let count = 0;
     lines.on("line", (line) => {
-      if (!line.trim()) return;
-      const feature = JSON.parse(line);
-      const props = {};
-      for (const field of fields) {
-        const value = feature.properties[field.key];
-        const trimmed = typeof value === "string" ? value.trim() : value;
-        if (trimmed) props[field.label] = trimmed;
-      }
-      let geometry = feature.geometry;
-      if (geometry?.type === "MultiPolygon" && geometry.coordinates.length === 1) {
-        geometry = {type: "Polygon", coordinates: geometry.coordinates[0]};
-      }
+      if (!line.startsWith('{ "type": "Feature"')) return;
+      const feature = JSON.parse(line.replace(/,\s*$/, ""));
       count ++;
-      if (!gzip.write(`${JSON.stringify({type: "Feature", properties: props, geometry})}\n`)) {
+      if (!out.write(`${JSON.stringify(cleanFeature(feature, fields))}\n`)) {
         lines.pause();
-        gzip.once("drain", () => lines.resume());
+        out.once("drain", () => lines.resume());
       }
     });
     lines.on("error", reject);
-    lines.on("end", () => gzip.end());
+    lines.on("end", () => out.end());
     out.on("finish", () => resolve(count));
     out.on("error", reject);
   });
 }
 
 // Download a whole dataset as one pre-built GeoJSON file from the Geoportal's download
-// service (opendata.arcgis.com). This is much faster than paging through the API, and
-// keeps holes in polygons (eg. Nottingham in Nottinghamshire), which the API's GeoJSON
-// can return as separate polygons. Returns false if it fails, to fall back to the API.
+// services, which is much faster than paging through the API. Some datasets are only
+// available from one of the two services. Returns false if neither works, to fall back
+// to the API.
 async function downloadGeoBulk(file, out_path) {
   const layer = await getLayerId(file.id);
   const info = await getLayerInfo(file.id, layer);
   const fields = resolveFields(info.fields, file.code, yy(file.year));
   const expected = await getFeatureCount(file.id, layer);
   if (expected === 0) throw new Error(`Dataset "${file.id}" has no features - it may have been published empty, so use another dataset`);
-  if (!info.serviceItemId) return false;
+  const item = info.serviceItemId;
+  if (!item) return false;
 
+  const urls = [
+    `https://opendata.arcgis.com/api/v3/datasets/${item}_${layer}/downloads/data?format=geojson&spatialRefId=4326&where=1%3D1`,
+    `https://hub.arcgis.com/api/download/v1/items/${item}/geojson?redirect=true&layers=${layer}&spatialRefId=4326`
+  ];
   const base = out_path.replace(".json.gz", "");
-  const temp = {hub: `${base}.hub.geojson`, select: `${base}.select.jsonl`, out: `${out_path}.part`};
+  const temp = {hub: `${base}.hub.geojson`, lines: `${base}.lines.geojson`, raw: `${base}.download.jsonl`};
+  console.log(`Downloading ${expected.toLocaleString()} features from ${file.id} as a single file`);
   try {
-    console.log(`Downloading ${expected.toLocaleString()} features from ${file.id} as a single file`);
-    const url = `https://opendata.arcgis.com/api/v3/datasets/${info.serviceItemId}_${layer}/downloads/data?format=geojson&spatialRefId=4326&where=1%3D1`;
-    await downloadToFile(url, temp.hub, {retries: 2});
-    // ogr2ogr keeps just the code/name fields and rounds the coordinates, streaming the file
-    await run(`ogr2ogr -f GeoJSONSeq -lco COORDINATE_PRECISION=${precisionFor(out_path)} -select "${fields.map(f => f.key).join(",")}" "${temp.select}" "${temp.hub}"`, {env: {OGR_GEOJSON_MAX_OBJ_SIZE: 8000}});
-    const count = await writeFeatures(temp.select, temp.out, fields);
+    for (const [i, url] of urls.entries()) {
+      try {
+        await downloadToFile(url, temp.hub, {retries: 1});
+        break;
+      } catch (err) {
+        if (i === urls.length - 1) throw err;
+      }
+    }
+    // Keep just the code/name fields, as plain GeoJSON with one feature per line. (Unlike
+    // GeoJSONSeq, this keeps the rings' winding order, which fixRings relies on.)
+    await run(`ogr2ogr -f GeoJSON -lco RFC7946=NO -select "${fields.map(f => f.key).join(",")}" "${temp.lines}" "${temp.hub}"`, {env: {OGR_GEOJSON_MAX_OBJ_SIZE: 8000}});
+    rmSync(temp.hub, {force: true});
+    const count = await writeCleanFeatures(temp.lines, temp.raw, fields);
     if (count !== expected) throw new Error(`expected ${expected.toLocaleString()} features but the file has ${count.toLocaleString()}`);
-    renameSync(temp.out, out_path);
+    // Round the coordinates and gzip, as for downloads from the API
+    await convertGeo(temp.raw, out_path);
     return true;
   } catch (err) {
     console.log(`Single-file download of ${file.id} failed (${err.message.split("\n")[0]}), so paging through the API instead`);

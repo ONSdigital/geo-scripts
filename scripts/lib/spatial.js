@@ -108,6 +108,52 @@ function prepareRing(ring) {
   };
 }
 
+// Signed area of a ring (in coordinate units): negative if clockwise
+export function ringArea(ring) {
+  let sum = 0;
+  for (let i = 0; i < ring.length - 1; i ++) sum += (ring[i + 1][0] - ring[i][0]) * (ring[i + 1][1] + ring[i][1]);
+  return -sum / 2;
+}
+
+function ringBounds(ring) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of ring) {
+    if (x < x0) x0 = x;
+    if (y < y0) y0 = y;
+    if (x > x1) x1 = x;
+    if (y > y1) y1 = y;
+  }
+  return [x0, y0, x1, y1];
+}
+
+// Rebuild a Polygon/MultiPolygon from its rings using Esri's winding order (outer rings
+// clockwise, holes anticlockwise), putting each hole in the smallest outer ring that
+// contains it. The Geoportal's GeoJSON sometimes returns holes as separate polygons
+// (eg. Nottingham inside Nottinghamshire). Correctly structured geometry is unchanged,
+// and holes that aren't inside any outer ring are kept as polygons.
+export function fixRings(geometry) {
+  if (!geometry || !["Polygon", "MultiPolygon"].includes(geometry.type)) return geometry;
+  const rings = (geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates).flat(1);
+  const outers = rings.filter(r => ringArea(r) < 0);
+  if (outers.length === 0) return geometry;
+
+  const polygons = outers.map(ring => ({
+    rings: [ring],
+    area: Math.abs(ringArea(ring)),
+    bounds: ringBounds(ring),
+    contains: preparePointInPolygon({type: "Polygon", coordinates: [ring]})
+  }));
+  for (const hole of rings.filter(r => ringArea(r) >= 0)) {
+    const container = polygons
+      .filter(p => p.contains && pointInBBox(hole[0], p.bounds) && p.contains(hole[0]))
+      .sort((a, b) => a.area - b.area)[0];
+    if (container) container.rings.push(hole);
+    else polygons.push({rings: [hole]});
+  }
+  const coordinates = polygons.map(p => p.rings);
+  return coordinates.length === 1 ? {type: "Polygon", coordinates: coordinates[0]} : {type: "MultiPolygon", coordinates};
+}
+
 // Returns a fast test equivalent to turf.booleanPointInPolygon(pt, geometry),
 // for testing many points against the same Polygon or MultiPolygon
 export function preparePointInPolygon(geometry, {ignoreBoundary = false} = {}) {
