@@ -24,7 +24,7 @@ export default {
     }},
     {key: "rgn", year: 2022, code: "RGN", ids: {
       bfe: "Regions_December_2022_EN_BFE",
-      bfc: "Regions_December_2022_EN_BFC",
+      bfc: "Regions_December_2022_Boundaries_EN_BFC_V2",
       bgc: "Regions_December_2022_EN_BGC",
       buc: "Regions_December_2022_EN_BUC",
     }},
@@ -41,10 +41,10 @@ export default {
       buc: "Combined_Authorities_May_2023_Boundaries_EN_BUC",
     }},
     {key: "cauth", year: 2025, code: "CAUTH", ids: {
-      bfe: "CAUTH_MAY_2025_EN_BFE",
-      bfc: "CAUTH_MAY_2025_EN_BFC",
-      bgc: "CAUTH_MAY_2025_EN_BGC",
-      buc: "CAUTH_MAY_2025_EN_BSC", // BSC used for the BUC slot (no BUC published for this year)
+      bfe: "Combined_Authorities_December_2025_Boundaries_EN_BFE",
+      bfc: "Combined_Authorities_December_2025_Boundaries_EN_BFC",
+      bgc: "Combined_Authorities_December_2025_Boundaries_EN_BGC",
+      buc: "Combined_Authorities_December_2025_Boundaries_EN_BUC",
     }},
     {key: "cty", year: 2022, code: "CTY", ids: {
       bfe: "Counties_December_2022_EN_BFE",
@@ -53,22 +53,22 @@ export default {
       buc: "Counties_December_2022_EN_BUC",
     }},
     {key: "cty", year: 2023, code: "CTY", ids: {
-      bfe: "Counties_May_2023_Boundaries_EN_BFE",
-      bfc: "Counties_May_2023_Boundaries_EN_BFC",
-      bgc: "Counties_May_2023_Boundaries_EN_BGC",
-      buc: "Counties_May_2023_Boundaries_EN_BUC",
+      bfe: "Counties_December_2023_Boundaries_EN_BFE",
+      bfc: "Counties_December_2023_Boundaries_EN_BFC",
+      bgc: "Counties_December_2023_Boundaries_EN_BGC",
+      buc: "CTY_DEC_2023_UK_BUC_V2",
     }},
     {key: "ltla", year: 2022, code: "LAD", ids: {
-      bfe: "LAD_DEC_2022_UK_BFE_V2",
-      bfc: "Local_Authority_Districts_December_2022_Boundaries_UK_BFC",
-      bgc: "Local_Authority_Districts_December_2022_Boundaries_UK_BGC",
-      buc: "Local_Authority_Districts_December_2022_Boundaries_UK_BUC",
+      bfe: "Local_Authority_Districts_December_2022_UK_BFE_V2",
+      bfc: "Local_Authority_Districts_December_2022_UK_BFC_V2",
+      bgc: "Local_Authority_Districts_December_2022_UK_BGC_V2",
+      buc: "Local_Authority_Districts_December_2022_UK_BUC_V2",
     }},
     {key: "ltla", year: 2023, code: "LAD", ids: {
-      bfe: "Local_Authority_Districts_May_2023_UK_BFE",
-      bfc: "Local_Authority_Districts_May_2023_UK_BFC",
-      bgc: "Local_Authority_Districts_May_2023_UK_BGC",
-      buc: "Local_Authority_Districts_May_2023_UK_BUC",
+      bfe: "Local_Authority_Districts_December_2023_Boundaries_UK_BFE",
+      bfc: "Local_Authority_Districts_December_2023_Boundaries_UK_BFC",
+      bgc: "Local_Authority_Districts_December_2023_Boundaries_UK_BGC",
+      buc: "Local_Authority_Districts_December_2023_Boundaries_UK_BUC",
     }},
     {key: "ltla", year: 2025, code: "LAD", ids: {
       // December 2025, the latest 2025 release (the May 2025 release included a proposed
@@ -110,15 +110,15 @@ export default {
     }},
     {key: "wd", year: 2022, code: "WD", ids: {
       bfe: "Wards_December_2022_Boundaries_GB_BFE",
-      bfc: "Wards_December_2022_Boundaries_GB_BFC",
-      bgc: "Wards_December_2022_Boundaries_GB_BGC",
-      bsc: "Wards_December_2022_Boundaries_GB_BSC",
+      bfc: "Wards_December_2022_Boundaries_UK_BFC",
+      bgc: "Wards_December_2022_Boundaries_UK_BGC",
+      bsc: "Wards_December_2022_Boundaries_UK_BSC",
     }},
     {key: "wd", year: 2023, code: "WD", ids: {
-      bfe: "WD_MAY_2023_UK_BFE",
-      bfc: "WD_MAY_2023_UK_BFC",
-      bgc: "WD_MAY_2023_UK_BGC",
-      bsc: "WD_MAY_2023_UK_BSC",
+      bfe: "Wards_December_2023_Boundaries_UK_BFE",
+      bfc: "Wards_December_2023_Boundaries_UK_BFC",
+      bgc: "Wards_December_2023_Boundaries_UK_BGC",
+      bsc: "Wards_December_2023_Boundaries_UK_BSC",
     }},
     {key: "wd", year: 2024, code: "WD", ids: {
       bfe: "Wards_May_2024_Boundaries_UK_BFE",
@@ -127,10 +127,10 @@ export default {
       bsc: "Wards_May_2024_Boundaries_UK_BSC",
     }},
     {key: "wd", year: 2025, code: "WD", ids: {
-      bfe: "WD_MAY_2025_UK_BFE",
-      bfc: "WD_MAY_2025_UK_BFC",
-      bgc: "WD_MAY_2025_UK_BGC",
-      bsc: "WD_MAY_2025_UK_BSC",
+      bfe: "WD_DEC_2025_UK_BFE",
+      bfc: "WD_DEC_2025_UK_BFC",
+      bgc: "WD_DEC_2025_UK_BGC",
+      bsc: "WD_DEC_2025_UK_BSC",
     }},
     {key: "ttwa", year: 2011, code: "TTWA", ids: {
       bfe: "Travel_to_Work_Areas_Dec_2011_FEB_in_United_Kingdom_2022",
@@ -142,32 +142,32 @@ export default {
       bfc: "BUA_2022_GB",
     }},
     {key: "msoa", year: 2021, code: "MSOA", ids: {
-      bfe: "Middle_Layer_Super_Output_Areas_2021_EW_BFE_V6",
-      bfc: "Middle_Layer_Super_Output_Areas_Dec_2021_Boundaries_Full_Clipped_EW_BFC_2022",
-      bgc: "MSOA_Dec_2021_Boundaries_Generalised_Clipped_EW_BGC_2022",
-      bsc: "MSOA_2021_EW_BSC",
+      bfe: "Middle_layer_Super_Output_Areas_December_2021_Boundaries_EW_BFE_V8",
+      bfc: "Middle_layer_Super_Output_Areas_December_2021_Boundaries_EW_BFC_V7",
+      bgc: "Middle_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V3",
+      bsc: "Middle_layer_Super_Output_Areas_December_2021_Boundaries_EW_BSC_V3",
     }},
     {key: "lsoa", year: 2021, code: "LSOA", ids: {
-      bfe: "Lower_Layer_Super_Output_Area_2021_EW_BFE_V8",
-      bfc: "LSOA_Dec_2021_Boundaries_Full_Clipped_EW_BFC_2022",
-      bgc: "LSOA_Dec_2021_Boundaries_Generalised_Clipped_EW_BGC_V2",
-      bsc: "LSOA_2021_EW_BSC",
+      bfe: "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BFE_V10",
+      bfc: "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BFC_V10",
+      bgc: "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5",
+      bsc: "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BSC_V4",
     }},
     {key: "oa", year: 2021, code: "OA", ids: {
-      bfe: "Output_Areas_2021_EW_BFE_V8",
-      bfc: "Output_Areas_Dec_2021_Boundaries_Full_Clipped_EW_BFC_2022",
-      bgc: "Output_Areas_Dec_2021_Boundaries_Generalised_Clipped_EW_BGC_2022",
+      bfe: "Output_Areas_2021_EW_BFE_V9",
+      bfc: "Output_Areas_2021_EW_BFC_V8",
+      bgc: "Output_Areas_2021_EW_BGC_V2",
     }},
   ],
   centroids: [
     {key: "oa", year: 2021, code: "OA", ids: {
-      pwc: "Output_Areas_2021_PWC_V3",
+      pwc: "OA_December_2021_EW_PWC_V4",
     }},
     {key: "lsoa", year: 2021, code: "LSOA", ids: {
       pwc: "LLSOA_Dec_2021_PWC_for_England_and_Wales_2022",
     }},
     {key: "msoa", year: 2021, code: "MSOA", ids: {
-      pwc: "Middle_Super_Output_Areas_DEC_2021_EW_PWC",
+      pwc: "MSOA_December_2021_EW_PWC_V2",
     }},
   ],
   census: [
