@@ -179,6 +179,6 @@ if (skipped.length) {
 }
 if (releases.length > skipped.length) {
   console.log("\nBoundaries change at most once a year, so each year uses the most recent release published in it. " +
-    "For a new year, add its entry to config/source-files.js and the year to config/geo-config.js " +
-    "(and config/vtiles-config.js if needed). For an update, replace the year's entry, then re-download with --force.");
+    "For a new year, add its entry to config/source-files.js (geographies and tilesets pick up years from there). " +
+    "For an update, replace the year's entry, then re-download with --force.");
 }

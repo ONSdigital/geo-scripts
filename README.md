@@ -150,9 +150,9 @@ This script generates a directory of [tiled GeoJSON files](docs/GeoJSON-tiles.md
 
 All of the config files for these scripts can be found within the `/config` folder. The files that need to be updated with each geography update are:
 
-- **source-files.js** - Defines the files to download from the ONS Geoportal, with one entry per geography and year listing the dataset for each detail level.
-- **geo-config.js** - Defines the geography types and which years they cover. Geographies must be listed in hierarchy order (parents before children).
-- **vtiles-config.js** - Defines the vector tiles outputs.
+- **source-files.js** - Defines the files to download from the ONS Geoportal, with one entry per geography and year listing the dataset for each detail level. **This is the only place years are set**: each geography covers the years it has entries for here.
+- **geo-config.js** - Defines the geography types and their hierarchy. Geographies must be listed in hierarchy order (parents before children).
+- **vtiles-config.js** - Defines the vector tilesets. A version of each tileset is made for every year that any of its geographies has boundaries for, named after that year (eg. `la25` combines the latest local authority, county and combined authority boundaries up to 2025).
 
 In addition, **paths.js** defines where every input, intermediate and output file is written.
 
@@ -163,7 +163,7 @@ To generate partial outputs, use the `--geo` and `--year` options (see above) ra
 It should be possible to add additional geographies or years by modifying the config files, without the need to edit the script files. To add a newly published year of a geography:
 
 1. Run `npm run check-sources` and copy the suggested entry for the new year into `/config/source-files.js`. (For a later release within a year already in the config, replace that year's entry instead, and re-download it with `--force`.)
-2. Add the year to the geography's `years` in `/config/geo-config.js` (and add a tileset to `/config/vtiles-config.js` if needed).
+2. That's the only config change needed: the geography and its tilesets pick up the new year from `/config/source-files.js`.
 3. Run `npm test` to check the config is consistent.
 4. Download the new files with `npm run download-files -- --geo {key} --year {year}`, then run the rest of the pipeline (eg. `npm run all-scripts -- --geo {key}`).
 5. Archive the new files with `npm run archive-sources -- --geo {key} --year {year}` (needs write access to the archive repo; see [Source file archive](docs/Source-file-archive.md)).

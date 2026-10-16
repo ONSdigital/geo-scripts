@@ -79,3 +79,18 @@ test("vector tile sources exist and share the same detail levels", () => {
     }
   }
 });
+
+test("tilesets get a version for each year any source has boundaries for", async () => {
+  const { expandTilesets } = await import("../config/vtiles-config.js");
+  const years = {ltla: [2022, 2023, 2025], cty: [2022, 2023], cauth: [2022, 2024, 2025], wd: [2023, 2024]};
+  const tilesets = expandTilesets([{key: "la", sources: [{key: "ltla"}, {key: "cty"}, {key: "cauth"}]}, {key: "wd", minzoom: 6}], k => years[k]);
+  assert.deepEqual(tilesets.map(t => `${t.key}${t.year}: ${t.sources.map(s => s.key + s.year).join(" ")}`), [
+    "la2022: ltla2022 cty2022 cauth2022",
+    "la2023: ltla2023 cty2023 cauth2022",
+    "la2024: ltla2023 cty2023 cauth2024",
+    "la2025: ltla2025 cty2023 cauth2025",
+    "wd2023: wd2023",
+    "wd2024: wd2024"
+  ]);
+  assert.equal(tilesets.find(t => t.key === "wd").minzoom, 6);
+});
