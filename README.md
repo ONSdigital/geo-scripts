@@ -51,7 +51,8 @@ npm run all-scripts -- --geo wd
 
 | Script | Options |
 | ------ | ------- |
-| download-files | `--geo`, `--year`, `--force` (download again) |
+| download-files | `--geo`, `--year`, `--force` (download again), `--source geoportal` (skip the archive) |
+| archive-sources | `--geo`, `--year`, `--other` (include census/other files), `--dry-run` |
 | make-lists | `--geo`, `--year` |
 | get-best-fits, make-geos, make-cm-geos | `--geo` only, because their outputs combine every year of a geography. `make-geos --clean` deletes the selected types' files first. |
 | make-vtiles | `--geo`, `--year` (tileset keys from `vtiles-config.js`), `--force` (remake) |
@@ -80,6 +81,8 @@ The tests (in `/test`) cover the shared functions in `/scripts/lib` and the cons
 ### download-files
 
 This script will download and transform boundary and lookup files from the ONS Open Geography Portal, as well as MSOA Names from the House of Commons Library. The config can be found at `/config/source-files.js`.
+
+Files are downloaded from the [source file archive](docs/Source-file-archive.md) (GitHub releases in [ONSdigital/geo-source-files](https://github.com/ONSdigital/geo-source-files/releases)) when it has them, so that everyone uses the same files even after the Geoportal retires a dataset; other files come from the Geoportal. Add `--source geoportal` to skip the archive. New or corrected files are added to the archive with `npm run archive-sources` (see the [archive docs](docs/Source-file-archive.md)).
 
 Files that have already been downloaded are skipped. Failed requests are retried. If a file can't be downloaded, the script carries on with the others, lists the failures at the end, and exits with an error; no partial files are left behind. If a dataset is reported as unavailable, run `npm run check-sources` to find its replacement.
 
@@ -163,6 +166,7 @@ It should be possible to add additional geographies or years by modifying the co
 2. Add the year to the geography's `years` in `/config/geo-config.js` (and add a tileset to `/config/vtiles-config.js` if needed).
 3. Run `npm test` to check the config is consistent.
 4. Download the new files with `npm run download-files -- --geo {key} --year {year}`, then run the rest of the pipeline (eg. `npm run all-scripts -- --geo {key}`).
+5. Archive the new files with `npm run archive-sources -- --geo {key} --year {year}` (needs write access to the archive repo; see [Source file archive](docs/Source-file-archive.md)).
 
 ## Editing the scripts
 

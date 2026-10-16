@@ -16,5 +16,8 @@ The outputs below are organised by file type. The generated files cover a broad 
 **PBF format**
 - [Vector tiles](Vector-tiles.md) (for web maps)
 
+**Source files**
+- [Source file archive](Source-file-archive.md) (archived Geoportal downloads, as GitHub releases)
+
 **Deployment**
 - [Deploying to S3](Deploying-to-S3.md) (upload commands and headers for the gzipped outputs)

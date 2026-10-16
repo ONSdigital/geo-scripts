@@ -8,12 +8,18 @@ import { dirs, yy } from "../config/paths.js";
 import { expandGeoSources } from "./lib/sources.js";
 import { cli, selectGeos, isSelection } from "./lib/cli.js";
 import geo_config from "../config/geo-config.js";
+import { tagFor, assetUrl, getManifest, sha256File } from "./lib/archive.js";
 
-const usage = `Usage: npm run download-files -- [--geo ltla,wd] [--year 2025] [--force]
+const usage = `Usage: npm run download-files -- [--geo ltla,wd] [--year 2025] [--force] [--source geoportal]
   --geo, --year  only download boundaries/centroids for these geographies and years
                  (other source files are only downloaded when there is no selection)
-  --force        download again even if the file already exists`;
-const {opts, selected} = cli(usage, opts => selectGeos(geo_config, opts));
+  --force        download again even if the file already exists
+  --source       "archive" (default): use the copy in the source file archive if there is one,
+                 otherwise the Geoportal. "geoportal": always use the Geoportal.`;
+const {opts, selected} = cli(usage, opts => {
+  if (!["archive", "geoportal"].includes(opts.source)) throw new Error(`--source must be "archive" or "geoportal"`);
+  return selectGeos(geo_config, opts);
+}, {source: {type: "string", default: "archive"}});
 const isSelected = (file) => selected.some(g => g.key === file.key && g.years.includes(file.year));
 
 // Files to download, by input folder
@@ -111,16 +117,50 @@ const convertGeo = async (raw_path, out_path) => {
   rmSync(raw_path, {force: true});
 };
 
+// Use the archived copy of a file, if there is one (see config/archive.js). Local copies
+// that differ from the archive are replaced, so that corrections reach everyone.
+// Returns false if the file isn't archived.
+async function downloadFromArchive(file, name, path) {
+  if (opts.source !== "archive") return false;
+  const tag = tagFor(file);
+  let entry;
+  try {
+    entry = (await getManifest(tag))?.files?.[name];
+  } catch (err) {
+    console.warn(`Couldn't read the archive for ${tag} (${err.message}), so using the Geoportal`);
+    return false;
+  }
+  if (!entry) return false;
+  if (existsSync(path) && !opts.force) {
+    if (await sha256File(path) === entry.sha256) {
+      console.log(`${path} already downloaded (matches the archive)`);
+      return true;
+    }
+    console.log(`${path} differs from the archived copy, so replacing it`);
+  }
+  const tmp_path = `${path}.archive`;
+  await downloadToFile(assetUrl(tag, name), tmp_path);
+  if (await sha256File(tmp_path) !== entry.sha256) {
+    rmSync(tmp_path, {force: true});
+    throw new Error(`The archived ${name} doesn't match its checksum (it may be being replaced) - try again later, or use --source geoportal`);
+  }
+  renameSync(tmp_path, path);
+  console.log(`Downloaded ${path} from the archive (${tag})`);
+  return true;
+}
+
 async function downloadFile(key, file, dir) {
+  const name = ["boundaries", "centroids"].includes(key) ? `${file.name}.json.gz` : file.name;
+  if (await downloadFromArchive(file, name, `${dir}/${name}`)) return;
   if (["boundaries", "centroids"].includes(key)) {
-    const out_path = `${dir}/${file.name}.json.gz`;
+    const out_path = `${dir}/${name}`;
     if (existsSync(out_path) && !opts.force) return console.log(`${out_path} already downloaded`);
     const raw_path = `${dir}/${file.name}.download.jsonl`;
     await downloadGeo(file, raw_path);
     await convertGeo(raw_path, out_path);
     console.log(`Downloaded and transformed ${out_path}`);
   } else {
-    const path = `${dir}/${file.name}`;
+    const path = `${dir}/${name}`;
     if (existsSync(path) && !opts.force) return console.log(`${path} already downloaded`);
     if (key === "census") await downloadLookup(file, path);
     else await downloadToFile(file.href, path);
