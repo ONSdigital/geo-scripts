@@ -37,8 +37,6 @@ Only files that are new or have changed are uploaded. Each release's `manifest.j
 
 Without `--geo`/`--year`, every downloaded source file is archived, including the census and other files (add `--other` to include those with a selection).
 
-If uploads fail with connection errors such as `tls: bad record MAC`, try connecting to the VPN, or a different network: some connections interfere with uploads to GitHub.
-
 ### Adding a new year
 
 1. Run `npm run check-sources` and add the suggested entry to `config/source-files.js` (see the [README](../README.md#updating-the-config-files)).
