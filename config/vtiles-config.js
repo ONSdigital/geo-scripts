@@ -22,7 +22,6 @@ const tilesets = [
     // Mark local authorities and counties in a combined authority in that year
     metadata: {flag: "cauth"}
   },
-  {key: "ltla", minzoom: 3},
   {key: "wpc", minzoom: 4},
   {
     key: "sen",
