@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { expandGeoSources, checkManifest, findNewReleases } from "../scripts/lib/sources.js";
+import { expandGeoSources, checkManifest, findNewReleases, codesInYear, compareCodes, datasetsBySize } from "../scripts/lib/sources.js";
 
 const manifest = expandGeoSources([
   {key: "ltla", year: 2025, code: "LAD", ids: {
@@ -76,4 +76,31 @@ test("findNewReleases suggests the latest release in each calendar year", () => 
       bfc: "WD_DEC_2025_UK_BFC_V2"
     }, missing: []}
   ]);
+});
+
+test("codesInYear uses start/end years from the lookup", () => {
+  const rows = [
+    {areacd: "E07000001"},
+    {areacd: "E07000002", end: 2022},
+    {areacd: "E06000099", start: 2023},
+    {areacd: "E05000001"}
+  ];
+  assert.deepEqual([...codesInYear(rows, ["E06", "E07"], 2022)], ["E07000001", "E07000002"]);
+  assert.deepEqual([...codesInYear(rows, ["E06", "E07"], 2025)], ["E07000001", "E06000099"]);
+});
+
+test("compareCodes finds new and ended codes of the configured types only", () => {
+  const before = new Set(["E05000001", "E05000002", "W05000001"]);
+  const after = ["E05000001", "E05000003", "W05000001", "S13000001", "N08000001"];
+  assert.deepEqual(compareCodes(before, after, ["E05", "W05"]), {
+    added: ["E05000003"],
+    removed: ["E05000002"],
+    otherPrefixes: ["N08", "S13"]
+  });
+  const same = compareCodes(before, ["W05000001", "E05000002", "E05000001", "S13000001"], ["E05", "W05"]);
+  assert.deepEqual([same.added, same.removed], [[], []]);
+});
+
+test("datasetsBySize lists the quickest datasets to query first", () => {
+  assert.deepEqual(datasetsBySize({bfe: "A_BFE", bfc: "A_BFC", bgc: "A_BGC", bsc: "A_BSC"}), ["A_BSC", "A_BGC", "A_BFC", "A_BFE"]);
 });

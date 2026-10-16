@@ -75,6 +75,29 @@ export function queryUrl(id, {layer = 0, offset = 0, limit = 2000, orderBy} = {}
   return `${layerUrl(id, layer)}/query?${params}`;
 }
 
+// Fetch attribute values only (no geometry), eg. to get a dataset's area codes
+// without downloading its boundaries. Returns an array of {field: value} rows.
+export async function fetchAttributes(id, outFields, {layer = 0, orderBy} = {}) {
+  const expected = await getFeatureCount(id, layer);
+  const rows = [];
+  while (rows.length < expected) {
+    const params = new URLSearchParams({
+      where: "1=1",
+      outFields: outFields.join(","),
+      returnGeometry: false,
+      resultRecordCount: 2000,
+      resultOffset: rows.length,
+      f: "json"
+    });
+    if (orderBy) params.set("orderByFields", orderBy);
+    const json = checkResponse(await fetchJSON(`${layerUrl(id, layer)}/query?${params}`), id);
+    if (!json.features?.length) break;
+    rows.push(...json.features.map(f => f.attributes));
+  }
+  if (rows.length !== expected) throw new Error(`Expected ${expected} rows from ${id} but received ${rows.length}`);
+  return rows;
+}
+
 // Map the dataset's {CODE}{YY}CD/NM/NMW fields to areacd/areanm/areanmw.
 // Field-name case varies between datasets, so match case-insensitively.
 export function resolveFields(fields, code, yr) {

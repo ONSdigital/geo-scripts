@@ -57,6 +57,33 @@ export function checkManifest(files, catalogue) {
   });
 }
 
+// Codes of the given types that were valid in a year, from lookup.csv rows (which
+// record the first/last year of areas that are new or have ended)
+export function codesInYear(rows, prefixes, year) {
+  return new Set(rows
+    .filter(d => prefixes.includes(d.areacd.slice(0, 3)) && (!d.start || d.start <= year) && (!d.end || d.end >= year))
+    .map(d => d.areacd));
+}
+
+// Compare two sets of area codes, only counting the given type prefixes. Codes are what
+// change when areas are merged, split or have their boundaries redrawn.
+export function compareCodes(before, after, prefixes) {
+  const inScope = (cd) => prefixes.includes(cd.slice(0, 3));
+  const b = new Set([...before].filter(inScope));
+  const a = new Set([...after].filter(inScope));
+  return {
+    added: [...a].filter(cd => !b.has(cd)).sort(),
+    removed: [...b].filter(cd => !a.has(cd)).sort(),
+    // Types in the release that aren't configured (eg. Scottish wards in a UK file)
+    otherPrefixes: [...new Set([...after].filter(cd => !inScope(cd)).map(cd => cd.slice(0, 3)))].sort()
+  };
+}
+
+// A release's datasets, quickest to query first (they all have the same attributes)
+export function datasetsBySize(ids) {
+  return ["buc", "bsc", "bgc", "bfc", "bfe", "pwc"].filter(d => ids[d]).map(d => ids[d]);
+}
+
 // Boundaries change at most once a year, so each calendar year uses the most recent
 // release published in that year. For each geography, this finds:
 //   - "update": a later release within a year already in the manifest (eg. Dec 2025
