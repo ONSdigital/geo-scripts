@@ -47,23 +47,38 @@ for (const file of files) {
   byTag.get(tag).push(file);
 }
 
-if (!dryRun) {
-  try {
-    await run("gh auth status");
-  } catch {
+let hasGh = true;
+try {
+  await run("gh auth status");
+} catch {
+  hasGh = false;
+  if (!dryRun) {
     console.error("The GitHub CLI (gh) needs to be installed and logged in (gh auth login) to upload to the archive.");
     process.exit(1);
   }
 }
 
 const repo = `-R ${archive.repo}`;
+
+// A release's current manifest, or null if there isn't one. This goes through the GitHub
+// API: the public download URL can lag behind just after an upload, and merging into an
+// out-of-date manifest would drop files from it.
+async function readManifest(tag) {
+  try {
+    return JSON.parse(await run(`gh release download "${tag}" ${repo} --pattern ${MANIFEST} --output -`));
+  } catch (err) {
+    if (/release not found|no assets match/i.test(err.message)) return null;
+    throw err;
+  }
+}
 // Uploads can fail on network errors, and --clobber makes a retry safe
 const upload = (tag, path) => withRetry(() => run(`gh release upload "${tag}" "${path}" ${repo} --clobber`), {label: `Upload of ${path}`});
 const tempDir = `${dirs.temp}/archive`;
 let uploads = 0;
 
 for (const [tag, tagFiles] of byTag) {
-  const existing = await getManifest(tag);
+  // (A dry run without gh uses the public manifest, which may lag just after an upload)
+  const existing = hasGh ? await readManifest(tag) : await getManifest(tag);
   const entries = {};
   const changed = [];
   for (const file of tagFiles) {

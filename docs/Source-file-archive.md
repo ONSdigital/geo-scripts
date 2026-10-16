@@ -33,7 +33,9 @@ npm run archive-sources -- --geo wd --year 2026 --dry-run   # see what would be 
 npm run archive-sources -- --geo wd --year 2026
 ```
 
-Only files that are new or have changed are uploaded. Each release's `manifest.json` is uploaded last, so it only ever lists files that are in place. Without `--geo`/`--year`, every downloaded source file is archived, including the census and other files (add `--other` to include those with a selection).
+Only files that are new or have changed are uploaded. Each release's `manifest.json` is uploaded last, so it only ever lists files that are in place. (`archive-sources` reads the existing manifests through the GitHub API, because the public download links can take a few minutes to show newly uploaded files. Until then, `download-files` may still use the Geoportal for those files.)
+
+If uploads fail with connection errors such as `tls: bad record MAC`, try connecting to the VPN, or a different network: some connections interfere with uploads to GitHub. Without `--geo`/`--year`, every downloaded source file is archived, including the census and other files (add `--other` to include those with a selection).
 
 ### Adding a new year
 
