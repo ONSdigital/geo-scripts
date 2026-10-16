@@ -84,7 +84,7 @@ This script will download and transform boundary and lookup files from the ONS O
 
 Files are downloaded from the [source file archive](docs/Source-file-archive.md) (GitHub releases in [ONSdigital/geo-source-files](https://github.com/ONSdigital/geo-source-files/releases)) when it has them, so that everyone uses the same files even after the Geoportal retires a dataset; other files come from the Geoportal. Add `--source geoportal` to skip the archive. New or corrected files are added to the archive with `npm run archive-sources` (see the [archive docs](docs/Source-file-archive.md)).
 
-Files that have already been downloaded are skipped. Failed requests are retried. If a file can't be downloaded, the script carries on with the others, lists the failures at the end, and exits with an error; no partial files are left behind. If a dataset is reported as unavailable, run `npm run check-sources` to find its replacement.
+Boundaries are downloaded from the Geoportal as single pre-built files, which is much faster than paging through its API (the API is used if that fails). Files that have already been downloaded are skipped. Failed requests are retried. If a file can't be downloaded, the script carries on with the others, lists the failures at the end, and exits with an error; no partial files are left behind. If a dataset is reported as unavailable, run `npm run check-sources` to find its replacement.
 
 ### make-virtual-boundaries
 

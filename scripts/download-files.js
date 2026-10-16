@@ -1,4 +1,6 @@
-import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync } from "fs";
+import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync, createWriteStream } from "fs";
+import zlib from "zlib";
+import readline from "line-by-line";
 import { csvFormat } from "d3-dsv";
 import { run, csvParse, mkdir } from "./utils.js";
 import { fetchText, fetchJSON, downloadToFile } from "./lib/http.js";
@@ -110,9 +112,12 @@ const downloadLookup = async (file, path) => {
 };
 
 // Convert raw GeoJSONSeq to rounded, gzipped GeoJSONSeq at out_path
+// Coordinate precision for a file's detail level
+const precisionFor = (path) => path.includes("_bf") || path.includes("_pwc") ? 6 : path.includes("_bu") ? 4 : 5;
+
 const convertGeo = async (raw_path, out_path) => {
   const tmp_path = out_path.replace(".json.gz", ".convert.json");
-  const precision = out_path.includes("_bf") || out_path.includes("_pwc") ? 6 : out_path.includes("_bu") ? 4 : 5;
+  const precision = precisionFor(out_path);
   rmSync(tmp_path, {force: true});
   rmSync(`${tmp_path}.gz`, {force: true});
   await run(`ogr2ogr -f GeoJSONSeq -lco COORDINATE_PRECISION=${precision} "${tmp_path}" "${raw_path}"`, {env: {OGR_GEOJSON_MAX_OBJ_SIZE: 8000}});
@@ -158,6 +163,74 @@ async function downloadFromArchive(file, name, path, source, force) {
   return true;
 }
 
+// Write GeoJSONSeq features as gzipped GeoJSONSeq, with properties renamed to
+// areacd/areanm/areanmw (trimmed, blanks dropped) and single-part MultiPolygons as
+// Polygons. Streams line by line, as some files are several GB. Returns the count.
+function writeFeatures(input, output, fields) {
+  return new Promise((resolve, reject) => {
+    const gzip = zlib.createGzip();
+    const out = createWriteStream(output);
+    gzip.pipe(out);
+    const lines = new readline(input);
+    let count = 0;
+    lines.on("line", (line) => {
+      if (!line.trim()) return;
+      const feature = JSON.parse(line);
+      const props = {};
+      for (const field of fields) {
+        const value = feature.properties[field.key];
+        const trimmed = typeof value === "string" ? value.trim() : value;
+        if (trimmed) props[field.label] = trimmed;
+      }
+      let geometry = feature.geometry;
+      if (geometry?.type === "MultiPolygon" && geometry.coordinates.length === 1) {
+        geometry = {type: "Polygon", coordinates: geometry.coordinates[0]};
+      }
+      count ++;
+      if (!gzip.write(`${JSON.stringify({type: "Feature", properties: props, geometry})}\n`)) {
+        lines.pause();
+        gzip.once("drain", () => lines.resume());
+      }
+    });
+    lines.on("error", reject);
+    lines.on("end", () => gzip.end());
+    out.on("finish", () => resolve(count));
+    out.on("error", reject);
+  });
+}
+
+// Download a whole dataset as one pre-built GeoJSON file from the Geoportal's download
+// service (opendata.arcgis.com). This is much faster than paging through the API, and
+// keeps holes in polygons (eg. Nottingham in Nottinghamshire), which the API's GeoJSON
+// can return as separate polygons. Returns false if it fails, to fall back to the API.
+async function downloadGeoBulk(file, out_path) {
+  const layer = await getLayerId(file.id);
+  const info = await getLayerInfo(file.id, layer);
+  const fields = resolveFields(info.fields, file.code, yy(file.year));
+  const expected = await getFeatureCount(file.id, layer);
+  if (expected === 0) throw new Error(`Dataset "${file.id}" has no features - it may have been published empty, so use another dataset`);
+  if (!info.serviceItemId) return false;
+
+  const base = out_path.replace(".json.gz", "");
+  const temp = {hub: `${base}.hub.geojson`, select: `${base}.select.jsonl`, out: `${out_path}.part`};
+  try {
+    console.log(`Downloading ${expected.toLocaleString()} features from ${file.id} as a single file`);
+    const url = `https://opendata.arcgis.com/api/v3/datasets/${info.serviceItemId}_${layer}/downloads/data?format=geojson&spatialRefId=4326&where=1%3D1`;
+    await downloadToFile(url, temp.hub, {retries: 2});
+    // ogr2ogr keeps just the code/name fields and rounds the coordinates, streaming the file
+    await run(`ogr2ogr -f GeoJSONSeq -lco COORDINATE_PRECISION=${precisionFor(out_path)} -select "${fields.map(f => f.key).join(",")}" "${temp.select}" "${temp.hub}"`, {env: {OGR_GEOJSON_MAX_OBJ_SIZE: 8000}});
+    const count = await writeFeatures(temp.select, temp.out, fields);
+    if (count !== expected) throw new Error(`expected ${expected.toLocaleString()} features but the file has ${count.toLocaleString()}`);
+    renameSync(temp.out, out_path);
+    return true;
+  } catch (err) {
+    console.log(`Single-file download of ${file.id} failed (${err.message.split("\n")[0]}), so paging through the API instead`);
+    return false;
+  } finally {
+    for (const path of Object.values(temp)) rmSync(path, {force: true});
+  }
+}
+
 async function downloadFile(key, file, dir) {
   const name = ["boundaries", "centroids"].includes(key) ? `${file.name}.json.gz` : file.name;
   const source = file.id || file.href;
@@ -169,9 +242,11 @@ async function downloadFile(key, file, dir) {
   if (["boundaries", "centroids"].includes(key)) {
     const out_path = `${dir}/${name}`;
     if (existsSync(out_path) && !force) return console.log(`${out_path} already downloaded`);
-    const raw_path = `${dir}/${file.name}.download.jsonl`;
-    await downloadGeo(file, raw_path);
-    await convertGeo(raw_path, out_path);
+    if (!(await downloadGeoBulk(file, out_path))) {
+      const raw_path = `${dir}/${file.name}.download.jsonl`;
+      await downloadGeo(file, raw_path);
+      await convertGeo(raw_path, out_path);
+    }
     recordDownload(name, source, "geoportal");
     console.log(`Downloaded and transformed ${out_path}`);
   } else {
