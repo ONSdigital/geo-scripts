@@ -12,6 +12,7 @@ import { dirs } from "../config/paths.js";
 import { run, mkdir } from "./utils.js";
 import { cli, selectGeos, isSelection } from "./lib/cli.js";
 import { expandGeoSources } from "./lib/sources.js";
+import { withRetry } from "./lib/http.js";
 import { MANIFEST, tagFor, getManifest, sha256File, updateManifest } from "./lib/archive.js";
 
 const usage = `Usage: npm run archive-sources -- [--geo wd] [--year 2025] [--other] [--dry-run]
@@ -56,6 +57,8 @@ if (!dryRun) {
 }
 
 const repo = `-R ${archive.repo}`;
+// Uploads can fail on network errors, and --clobber makes a retry safe
+const upload = (tag, path) => withRetry(() => run(`gh release upload "${tag}" "${path}" ${repo} --clobber`), {label: `Upload of ${path}`});
 const tempDir = `${dirs.temp}/archive`;
 let uploads = 0;
 
@@ -100,13 +103,13 @@ for (const [tag, tagFiles] of byTag) {
   // Upload the files, then the manifest last, so that the manifest only lists files that are in place
   for (const file of changed) {
     console.log(`  uploading ${file.name} (${(statSync(file.path).size / 1e6).toFixed(1)} MB)`);
-    await run(`gh release upload "${tag}" "${file.path}" ${repo} --clobber`);
+    await upload(tag, file.path);
     uploads ++;
   }
   mkdir(`${tempDir}/${tag}`);
   const manifestPath = `${tempDir}/${tag}/${MANIFEST}`;
   writeFileSync(manifestPath, JSON.stringify(updateManifest(existing, tag, entries), null, 2));
-  await run(`gh release upload "${tag}" "${manifestPath}" ${repo} --clobber`);
+  await upload(tag, manifestPath);
   console.log(`  updated ${MANIFEST}`);
 }
 
