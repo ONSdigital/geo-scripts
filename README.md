@@ -30,7 +30,7 @@ You can then run each of the scripts below using the following command:
 npm run {script-name}
 ```
 
-It is important that the first three scripts are run in order before running the rest of the scripts, because they download and pre-process the necessary source files.
+It is important that the first four scripts (download-files, make-virtual-boundaries, get-metadata and get-relations) are run in order before running the rest of the scripts, because they download and pre-process the necessary source files.
 
 Alternatively, you can run all of the scripts - other than the vector tiles, postcode and search tiles scripts - by running the following command. It stops at the first step that fails:
 
@@ -85,6 +85,12 @@ This script will download and transform boundary and lookup files from the ONS O
 Files are downloaded from the [source file archive](docs/Source-file-archive.md) (GitHub releases in [ONSdigital/geo-source-files](https://github.com/ONSdigital/geo-source-files/releases)) when it has them, so that everyone uses the same files even after the Geoportal retires a dataset; other files come from the Geoportal. Add `--source geoportal` to skip the archive. New or corrected files are added to the archive with `npm run archive-sources` (see the [archive docs](docs/Source-file-archive.md)).
 
 Files that have already been downloaded are skipped. Failed requests are retried. If a file can't be downloaded, the script carries on with the others, lists the failures at the end, and exits with an error; no partial files are left behind. If a dataset is reported as unavailable, run `npm run check-sources` to find its replacement.
+
+### make-virtual-boundaries
+
+The United Kingdom (K02000001), Great Britain (K03000001) and England and Wales (K04000001) have no published boundary files. This script makes them by merging their countries' boundaries, for every year and detail level of the country files. These "virtual" geographies are defined in `/config/geo-config.js`.
+
+The UK is part of the hierarchy, as the parent of the four countries. Great Britain and England and Wales have the UK as their parent and their countries as children in their own area files, but aren't otherwise part of the hierarchy: no other area has them as a parent, and they have no parent in the master lookup.
 
 ### get-metadata
 

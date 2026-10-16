@@ -13,7 +13,7 @@ const startTime = new Date();
 
 const geo_keys = ["msoa", "lsoa", "oa"];
 const self_keys = ["ctry", "rgn"] // These non-changing codes can be their own lookups
-const skip_keys = ["uk"]; // Don't do best-fit for UK
+const skip_keys = geo_config.filter(g => g.virtual).map(g => g.key); // Don't do best-fit for the UK, GB etc.
 
 const usage = `Usage: npm run get-best-fits -- [--geo ltla,wd]
   --geo  only recalculate best-fits for these geographies, keeping the rest of the existing lookup files`;

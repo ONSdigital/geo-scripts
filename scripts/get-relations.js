@@ -211,7 +211,8 @@ for (const d of data) {
       poss_children[p].push(d.areacd);
     }
     poss_parents[d.areacd] = p_parents;
-  } else {
+  } else if (lookup[grp].parents.length > 0) {
+    // (Top-level geographies, eg. the UK, have no parents to find)
     console.log(`No possible parents found for ${d.areanm} (${d.areacd})!`);
   }
   i ++;

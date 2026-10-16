@@ -11,7 +11,8 @@ rejectSelection(opts, "search tiles combine every geography");
 import { run, getValidBoundariesPath, writeGzip, clearTemp, mkdir, csvParse } from "./utils.js";
 
 const sources = geos
-  .filter(g => g.key !== "uk")
+  // Virtual geographies (eg. the UK) cover everything, so aren't useful for search
+  .filter(g => !g.virtual)
   .map(g => {
     const paths = g.years.map(year => getValidBoundariesPath(g.key, `${year}`.slice(-2), ["bgc", "bfc"])).reverse();
     const outpath = `./temp/${g.key}.json`;

@@ -19,6 +19,7 @@ const geoOnly = opts.geo ? ["--geo", opts.geo.join(",")] : [];
 
 const steps = [
   ["download-files", selection],
+  ["make-virtual-boundaries", []],
   ["get-metadata", []],
   ["get-relations", []],
   ["make-lists", selection],

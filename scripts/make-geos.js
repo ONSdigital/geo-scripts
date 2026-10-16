@@ -1,9 +1,7 @@
 import { readFileSync, rmSync, createReadStream } from "fs";
 import zlib from "zlib";
 import readline from "line-by-line";
-import mapshaper from "mapshaper";
-import { bbox } from "@turf/turf";
-import { readGzip, writeGzip, csvParse, findPolylabel, round, roundAll, mkdir } from "./utils.js";
+import { writeGzip, csvParse, mkdir } from "./utils.js";
 import geos from "../config/geo-config.js";
 import types from "../config/geo-types.js";
 import { dirs, files } from "../config/paths.js";
@@ -113,12 +111,18 @@ function makeGeo(geo, year, indexes, lookup, census_lookup) {
           props.replaces = getSuperseded(indexes.by_successor, areacd);
         }
 
-        // Add parents and children
-        props.children = getChildren(lookup, indexes.by_parent, areacd);
+        // Add parents and children. Virtual geographies outside the hierarchy (eg. Great
+        // Britain) take them from their config: their member countries, and the UK.
+        const outside = geo.virtual?.parent;
+        props.children = outside ?
+          geo.virtual.members.map(cd => propsToNames(lookup[cd])).sort((a, b) => a.areacd.localeCompare(b.areacd)) :
+          getChildren(lookup, indexes.by_parent, areacd);
         props.child_typecds = props.children[0] ?
           Array.from(new Set(props.children.map(c => c.areacd.slice(0, 3)))).sort((a, b) => a.localeCompare(b)) :
           [];
-        props.parents = getParents(lookup, areacd);
+        props.parents = outside ?
+          [propsToNames(lookup[geo.virtual.parent], ["start", "end"])] :
+          getParents(lookup, areacd);
 
         // Add census best-fit lookups
         const keys = ["oa", "lsoa", "msoa"];
@@ -143,48 +147,6 @@ function makeGeo(geo, year, indexes, lookup, census_lookup) {
     });
 
     lineReader.on("end", async () => {
-      resolve();
-    });
-  });
-}
-
-function makeMergedGeo(props, childcds) {
-  return new Promise((resolve) => {
-    console.log(`Creating merged geography ${props.areanm} (${props.areacd}) from ${childcds.join(", ")}`);
-    const geojson = {type: "FeatureCollection", features: []};
-    const ft = [];
-    for (const ccd of childcds) {
-      const path = `${dirs.geos}/${ccd.slice(0, 3)}/${ccd}.json`;
-      const feature = JSON.parse(readGzip(path));
-      // Keep the child's own properties before overwriting areacd for the dissolve
-      ft.push({...feature.properties});
-      feature.properties = {areacd: props.areacd};
-      geojson.features.push(feature);
-    }
-
-    mapshaper.applyCommands("-i input.geojson -dissolve2 fields=areacd -o output.geojson", {"input.geojson": geojson}, (err, output) => {
-      if (err) throw err;
-      const merged = JSON.parse(output["output.geojson"]).features[0];
-
-      if (!props.groupcd) props.groupcd = null;
-      if (!props.groupnm) props.groupnm = props.areanm.toLowerCase();
-      props.typecd = props.areacd.slice(0, 3);
-      if (!props.typenm) props.typenm = props.areanm.toLowerCase();
-      props.areakm2 = round(ft.reduce((sum, f) => sum + (f.areakm2 || 0), 0), 4);
-      props.bounds = bbox(merged);
-      props.centroid = roundAll(findPolylabel(merged));
-      props.children = ft.map(f => propsToNames(f));
-      props.child_typecds = Array.from(new Set(ft.map(f => f.areacd.slice(0, 3)))).sort((a, b) => a.localeCompare(b));
-      props.parents = ft[0].parents;
-
-      const outdir = `${dirs.geos}/${props.areacd.slice(0, 3)}`;
-      mkdir(outdir);
-
-      const outpath = `${outdir}/${props.areacd}.json`;
-      const feature = {type: "Feature", properties: props, geometry: merged.geometry};
-
-      writeGzip(outpath, JSON.stringify(feature));
-      console.log(`Wrote merged geography to ${outpath}`);
       resolve();
     });
   });
@@ -228,12 +190,6 @@ for (const geo of selected) {
     await makeGeo(geo, year, indexes, lookup, census_lookup);
   }
 }
-
-// Make England and Wales file (from the country files)
-if (selected.some(g => g.key === "ctry")) await makeMergedGeo(
-  {areacd: "K04000001", areanm: "England and Wales", areanmw: "Cymru a Lloegr", groupcd: "ew"},
-  ["E92000001", "W92000004"]
-);
 
 const endTime = new Date();
 const duration = Math.round((endTime - startTime) / 1000);

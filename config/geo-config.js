@@ -1,6 +1,13 @@
 // Geography types. Each geography covers the years it has boundaries for in
 // config/source-files.js, so years aren't set here.
 //
+// Virtual geographies have no published boundaries: scripts/make-virtual-boundaries.js
+// makes them by merging their member countries, for every year of the "from" geography.
+// The UK is the countries' parent. Great Britain and England and Wales have the UK as
+// their parent and their countries as children in their own area files, but aren't
+// part of the hierarchy otherwise (they aren't the parent of anything, and have no
+// parentcd in lookup.csv).
+//
 // IMPORTANT:
 // The administrative geographies need to be entered in the order of their hierarchy
 // This is to ensure that English geographies find their all their parents
@@ -14,8 +21,11 @@ const geographies = [
     label: "United Kingdom",
 		parents: [],
     detail: "buc",
-    // Made from the country boundaries, so it covers the same years
-    virtual: {from: "ctry"}
+    virtual: {
+      from: "ctry",
+      code: "K02000001", name: "United Kingdom", namew: "Y Deyrnas Gyfunol",
+      members: ["E92000001", "N92000002", "S92000003", "W92000004"]
+    }
   },
   {
     key: "ctry",
@@ -24,6 +34,33 @@ const geographies = [
     label: "country",
     detail: "buc",
     list: ["ap", "cp"]
+  },
+  {
+    key: "gb",
+    codes: ["K03"],
+    label: "Great Britain",
+    parents: [],
+    detail: "buc",
+    virtual: {
+      from: "ctry",
+      code: "K03000001", name: "Great Britain", namew: "Prydain Fawr",
+      members: ["E92000001", "S92000003", "W92000004"],
+      parent: "K02000001"
+    }
+  },
+  {
+    key: "ew",
+    codes: ["K04"],
+    label: "England and Wales",
+    parents: [],
+    detail: "buc",
+    list: ["cp"],
+    virtual: {
+      from: "ctry",
+      code: "K04000001", name: "England and Wales", namew: "Cymru a Lloegr",
+      members: ["E92000001", "W92000004"],
+      parent: "K02000001"
+    }
   },
   {
     key: "rgn",

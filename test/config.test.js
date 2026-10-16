@@ -43,11 +43,30 @@ test("type names are for configured type codes", () => {
 
 test("every configured geography and year has the boundary files the scripts need", () => {
   for (const geo of geo_config) {
+    // Virtual geographies' files are made from another geography's files
+    const key = geo.virtual?.from || geo.key;
+    assert.ok(geo.years.length > 0, `${geo.key} has no years (no boundaries in source-files.js)`);
     for (const year of geo.years) {
-      const label = `${geo.key}${yy(year)}`;
-      assert.ok(has(geo.key, year, "bfc"), `${label}_bfc (used by get-metadata)`);
-      assert.ok(has(geo.key, year, "bfe") || has(geo.key, year, "bfc"), `${label}_bfe or _bfc (used by get-relations)`);
-      assert.ok(has(geo.key, year, geo.detail || "bgc"), `${label}_${geo.detail || "bgc"} (used by make-geos)`);
+      const label = `${key}${yy(year)}`;
+      assert.ok(has(key, year, "bfc"), `${label}_bfc (used by get-metadata)`);
+      assert.ok(has(key, year, "bfe") || has(key, year, "bfc"), `${label}_bfe or _bfc (used by get-relations)`);
+      assert.ok(has(key, year, geo.detail || "bgc"), `${label}_${geo.detail || "bgc"} (used by make-geos)`);
+    }
+  }
+});
+
+test("virtual geographies are made from configured areas, and only the UK is in the hierarchy", () => {
+  const parents = new Set(geo_config.flatMap(g => g.parents));
+  for (const geo of geo_config.filter(g => g.virtual)) {
+    const {from, code, members, parent} = geo.virtual;
+    const source = geo_config.find(g => g.key === from);
+    assert.ok(source, `${geo.key} is made from unknown geography ${from}`);
+    assert.ok(geo.codes.includes(code.slice(0, 3)), `${code} matches ${geo.key}'s codes`);
+    for (const cd of members) assert.ok(source.codes.includes(cd.slice(0, 3)), `${geo.key} member ${cd} is a ${from} code`);
+    if (parent) {
+      // Outside the hierarchy: nothing has it as a parent
+      assert.ok(!geo.codes.some(c => parents.has(c)), `${geo.key} shouldn't be a parent of other geographies`);
+      assert.ok(geo_config.some(g => g.virtual?.code === parent), `${geo.key}'s parent ${parent} is a virtual geography`);
     }
   }
 });
