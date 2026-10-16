@@ -1,4 +1,4 @@
-import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync } from "fs";
+import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync, openSync, readSync, closeSync } from "fs";
 import { csvFormat } from "d3-dsv";
 import { run, csvParse, mkdir } from "./utils.js";
 import { fetchText, fetchJSON, downloadToFile } from "./lib/http.js";
@@ -152,6 +152,15 @@ async function downloadFromArchive(file, name, path, source, force) {
   return true;
 }
 
+// Whether a file starts like a GeoJSON object (checks only the first few bytes)
+function looksLikeGeoJSON(path) {
+  const fd = openSync(path, "r");
+  const buffer = Buffer.alloc(64);
+  const read = readSync(fd, buffer, 0, 64, 0);
+  closeSync(fd);
+  return /^\s*\{\s*"type"/.test(buffer.subarray(0, read).toString());
+}
+
 // Download a whole dataset as one pre-built GeoJSON file from the Geoportal's download
 // services, which is much faster than paging through the API. Some datasets are only
 // available from one of the two services. Returns false if neither works, to fall back
@@ -176,6 +185,8 @@ async function downloadGeoBulk(file, out_path) {
     for (const [i, url] of urls.entries()) {
       try {
         await downloadToFile(url, temp.hub, {retries: 1});
+        // A service can reply "OK" with no file (eg. while it's still preparing one)
+        if (!looksLikeGeoJSON(temp.hub)) throw new Error("the download wasn't a GeoJSON file");
         break;
       } catch (err) {
         if (i === urls.length - 1) throw err;
