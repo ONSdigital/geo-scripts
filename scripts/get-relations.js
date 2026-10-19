@@ -224,9 +224,13 @@ const poss_successors = {};
 const successor_grps = [];
 
 i = 0;
+// Areas that end because their geography was abolished (lastYear) have no successors
+const lastYears = {};
+for (const geo of geo_config) if (geo.lastYear) for (const cd of geo.codes) lastYears[cd] = geo.lastYear;
+
 console.log("Finding possible successors by bbox...")
 for (const d of data) {
-  if (d.end) {
+  if (d.end && d.end !== lastYears[d.areacd.slice(0, 3)]) {
     const grp = d.areacd.slice(0, 3);
     if (!successor_grps.includes(grp)) successor_grps.push(grp);
     let p_successors = [];

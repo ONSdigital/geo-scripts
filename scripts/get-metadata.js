@@ -137,6 +137,13 @@ for (const d of data) {
   }
 }
 
+// Areas of an abolished geography (with a lastYear in geo-config.js) end then, even
+// though no later boundaries show them ending
+for (const d of data) {
+  const lastYear = geo_config.find(g => g.key === cdKeyLookup[d.areacd.slice(0, 3)])?.lastYear;
+  if (lastYear && (!d.end || d.end > lastYear)) d.end = lastYear;
+}
+
 writeFileSync(outpath, csvFormat(data, cols));
 console.log(`Wrote ${outpath}`);
 

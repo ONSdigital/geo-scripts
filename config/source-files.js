@@ -104,11 +104,30 @@ export default {
       bgc: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BGC",
       buc: "Senedd_Cymru_Constituencies_December_2022_Boundaries_WA_BUC",
     }},
+    {key: "senc", year: 2026, code: "SENC", ids: {
+      // The 2026 Senedd reform replaced the 40 constituencies and 5 regions with 16 constituencies
+      bfe: "SENC_MAY_2026_WA_BFE",
+      bfc: "SENC_MAY_2026_WA_BFC",
+      bgc: "SENC_MAY_2026_WA_BGC",
+      buc: "SENC_MAY_2026_WA_BSC", // BSC used for the BUC slot (no BUC published)
+    }},
     {key: "par", year: 2022, code: "PAR", ids: {
       bfe: "Parishes_Decemeber_2022_EW_BFE",
       bfc: "Parishes_December_2022_EW_BFC",
       bgc: "Parishes_December_2022_EW_BGC",
       bsc: "Parishes_December_2022_EW_BSC",
+    }},
+    {key: "par", year: 2023, code: "PAR", ids: {
+      bfe: "Parishes_May_2023_Boundaries_EW_BFE",
+      bfc: "Parishes_May_2023_Boundaries_EW_BFC",
+      bgc: "Parishes_May_2023_Boundaries_EW_BGC",
+      bsc: "Parishes_May_2023_Boundaries_EW_BSC",
+    }},
+    {key: "par", year: 2024, code: "PAR", ids: {
+      bfe: "Parishes_May_2024_Boundaries_EW_BFE",
+      bfc: "Parishes_May_2024_Boundaries_EW_BFC",
+      bgc: "Parishes_May_2024_Boundaries_EW_BGC",
+      bsc: "Parishes_May_2024_Boundaries_EW_BSC",
     }},
     {key: "wd", year: 2022, code: "WD", ids: {
       bfe: "Wards_December_2022_Boundaries_GB_BFE", // No longer on the Geoportal: use the archived copy
@@ -135,6 +154,12 @@ export default {
       bfc: "WD_DEC_2025_UK_BFC",
       bgc: "WD_DEC_2025_UK_BGC",
       bsc: "WD_DEC_2025_UK_BSC",
+    }},
+    {key: "wd", year: 2026, code: "WD", ids: {
+      bfe: "WD_MAY_2026_UK_BFE",
+      bfc: "WD_MAY_2026_UK_BFC",
+      bgc: "WD_MAY_2026_UK_BGC",
+      bsc: "WD_MAY_2026_UK_BSC",
     }},
     {key: "ttwa", year: 2011, code: "TTWA", ids: {
       bfe: "Travel_to_Work_Areas_Dec_2011_FEB_in_United_Kingdom_2022",

@@ -36,8 +36,9 @@ const tilesets = [
   // tileset is left out.
 ];
 
-// One entry per tileset and year, with the year each source uses
-export function expandTilesets(tilesets, yearsOf) {
+// One entry per tileset and year, with the year each source uses. A source whose
+// geography has been abolished (lastYear) is left out of later versions.
+export function expandTilesets(tilesets, yearsOf, lastYearOf = () => null) {
   return tilesets.flatMap(({sources, ...tileset}) => {
     const resolved = sources || [{key: tileset.key}];
     const years = [...new Set(resolved.flatMap(s => yearsOf(s.key)))].sort((a, b) => a - b);
@@ -45,14 +46,17 @@ export function expandTilesets(tilesets, yearsOf) {
       .map(year => ({
         ...tileset,
         year,
-        sources: resolved.map(s => {
-          const sourceYears = yearsOf(s.key).filter(y => y <= year);
-          return sourceYears.length ? {...s, year: Math.max(...sourceYears)} : null;
-        })
+        sources: resolved
+          .filter(s => { const last = lastYearOf(s.key); return !last || last >= year; })
+          .map(s => {
+            const sourceYears = yearsOf(s.key).filter(y => y <= year);
+            return sourceYears.length ? {...s, year: Math.max(...sourceYears)} : null;
+          })
       }))
       // Skip years before every source has boundaries
-      .filter(t => t.sources.every(s => s));
+      .filter(t => t.sources.length && t.sources.every(s => s));
   });
 }
 
-export default expandTilesets(tilesets, (key) => geo_config.find(g => g.key === key).years);
+const geo = (key) => geo_config.find(g => g.key === key);
+export default expandTilesets(tilesets, (key) => geo(key).years, (key) => geo(key).lastYear);

@@ -113,3 +113,19 @@ test("tilesets get a version for each year any source has boundaries for", async
   ]);
   assert.equal(tilesets.find(t => t.key === "wd").minzoom, 6);
 });
+
+test("tilesets leave out geographies after they were abolished", async () => {
+  const { expandTilesets } = await import("../config/vtiles-config.js");
+  const years = {sener: [2022], senc: [2022, 2026]};
+  const tilesets = expandTilesets([{key: "sen", sources: [{key: "sener", layer: "region"}, {key: "senc", layer: "constituency"}]}], k => years[k], k => k === "sener" ? 2025 : null);
+  assert.deepEqual(tilesets.map(t => `${t.key}${t.year}: ${t.sources.map(s => s.key + s.year).join(" ")}`), [
+    "sen2022: sener2022 senc2022",
+    "sen2026: senc2026"
+  ]);
+});
+
+test("abolished geographies end after their last configured year", () => {
+  for (const geo of geo_config.filter(g => g.lastYear)) {
+    assert.ok(geo.lastYear >= Math.max(...geo.years), `${geo.key} lastYear ${geo.lastYear} is before its boundaries`);
+  }
+});

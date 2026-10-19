@@ -1,5 +1,7 @@
 // Geography types. Each geography covers the years it has boundaries for in
-// config/source-files.js, so years aren't set here.
+// config/source-files.js, so years aren't set here. The one exception is lastYear, for a
+// geography that has been abolished: its areas end that year, rather than being treated
+// as still current because no later boundaries exist.
 //
 // Virtual geographies have no published boundaries: scripts/make-virtual-boundaries.js
 // makes them by merging their member countries, for every year of the "from" geography.
@@ -120,12 +122,16 @@ const geographies = [
 		codes: ["W10"],
 		parents: ["W92"],
     label: "Senedd electoral region",
+    // Abolished by the 2026 Senedd reform, so its areas end in 2025 and it isn't used
+    // as a parent or tileset layer after that
+    lastYear: 2025,
     list: ["ap", "cp"]
   },
   {
     key: "senc",
 		codes: ["W09"],
-		parents: ["W10"],
+		// Wales for constituencies from 2026, after the regions were abolished
+		parents: ["W10", "W92"],
     label: "Senedd constituency",
     list: ["ap", "cp"]
   },
