@@ -114,12 +114,17 @@ export function renamedCodes(before, after, prefixes) {
 // For lookups (eg. the NSPL), whether each dataset is still listed, and the newest
 // edition or version in the catalogue if there's a newer one: a later month/year (eg.
 // NSPL February -> May) or a higher version of the same release (eg. _v3 -> _v4).
-// Returns [{lookup, listed, newer}].
+// A lookup's joined table (see config/source-files.js) is checked as a lookup of its own,
+// needing its join and added columns. Returns [{lookup, listed, newer}].
 export function checkLookups(lookups, catalogue) {
   const available = new Set(catalogue);
   const parsed = catalogue.map(parseServiceName).filter(p => p);
   const rank = (p) => releaseOrder(p) * 1000 + p.version;
-  return lookups.filter(l => l.id).map(lookup => {
+  const tables = lookups.flatMap(l => l.join ? [l, {
+    key: `${l.key}-join`, name: `${l.name} (joined table)`, id: l.join.id,
+    columns: l.join.columns, required: Object.values(l.join.on)
+  }] : [l]);
+  return tables.filter(l => l.id).map(lookup => {
     const current = parseServiceName(lookup.id);
     const newer = current ? parsed
       .filter(p => p.familyKey === current.familyKey && !p.variant && rank(p) > rank(current))

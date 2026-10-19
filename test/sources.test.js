@@ -114,19 +114,22 @@ test("renamedCodes finds areas whose name changed but code didn't", () => {
 test("checkLookups finds newer editions and versions of lookups", async () => {
   const { checkLookups } = await import("../scripts/lib/sources.js");
   const lookups = [
-    {key: "census", id: "OA_LSOA_MSOA_EW_DEC_2021_LU_v3"},
+    {key: "census", id: "OA_LSOA_MSOA_EW_DEC_2021_LU_v3", join: {id: "LAD22_RGN22_EN_LU", on: {ltla22cd: "LAD22CD"}, columns: {RGN22CD: "rgn22cd"}}},
     {key: "nspl", id: "National_Statistics_Postcode_Lookup_(May_2026)_for_the_United_Kingdom"},
     {key: "msoa_names", href: "https://example.test/latest.csv"}
   ];
   const catalogue = [
     "OA_LSOA_MSOA_EW_DEC_2021_LU_v3",
     "OA_LSOA_MSOA_EW_DEC_2021_LU_v4",
+    "LAD22_RGN22_EN_LU",
     "National_Statistics_Postcode_Lookup_(February_2026)_for_the_UK_(Hosted_Table)",
     "National_Statistics_Postcode_Lookup_(August_2026)_for_the_United_Kingdom_(Hosted_Table)",
     "NSPL_Online_latest_Centroids"
   ];
   assert.deepEqual(checkLookups(lookups, catalogue).map(r => [r.lookup.key, r.listed, r.newer]), [
     ["census", true, "OA_LSOA_MSOA_EW_DEC_2021_LU_v4"],
+    // The joined table is checked too, with the columns it needs
+    ["census-join", true, null],
     ["nspl", false, "National_Statistics_Postcode_Lookup_(August_2026)_for_the_United_Kingdom_(Hosted_Table)"]
   ]);
 });

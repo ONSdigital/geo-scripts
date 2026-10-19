@@ -213,9 +213,13 @@ export default {
   //   columns: keep only these columns, renamed (otherwise all columns are kept)
   //   required: columns the scripts need, checked when downloading
   lookups: [
-    // Frozen Census 2021 OA -> LSOA -> MSOA -> LAD lookup, for interfacing with the Nomis API
-    {key: "census", name: "oa21_lsoa21_msoa21_ltla22.csv", id: "OA_LSOA_MSOA_EW_DEC_2021_LU_v3",
-      columns: {OA21CD: "oa21cd", LSOA21CD: "lsoa21cd", MSOA21CD: "msoa21cd", LAD22CD: "ltla22cd"}},
+    // Frozen Census 2021 OA -> LSOA -> MSOA -> LAD lookup, for interfacing with the Nomis API,
+    // with each LAD's region joined from a LAD -> region lookup (England only, so Welsh
+    // LADs take Wales as their region)
+    {key: "census", name: "oa21_lsoa21_msoa21_ltla22_rgn22.csv", id: "OA_LSOA_MSOA_EW_DEC_2021_LU_v3",
+      columns: {OA21CD: "oa21cd", LSOA21CD: "lsoa21cd", MSOA21CD: "msoa21cd", LAD22CD: "ltla22cd"},
+      join: {id: "LAD22_RGN22_EN_LU", on: {ltla22cd: "LAD22CD"}, columns: {RGN22CD: "rgn22cd"},
+        fallback: {W: {rgn22cd: "W92000004"}}}},
     // National Statistics Postcode Lookup, all columns, gzipped
     {key: "nspl", name: "nspl.csv.gz", id: "National_Statistics_Postcode_Lookup_(August_2026)_for_the_United_Kingdom_(Hosted_Table)",
       required: ["pcds", "lat", "long"]},

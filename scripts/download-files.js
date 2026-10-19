@@ -1,4 +1,5 @@
-import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync, openSync, readSync, closeSync } from "fs";
+import { readFileSync, writeFileSync, appendFileSync, existsSync, renameSync, rmSync, openSync, readSync, closeSync } from "fs";
+import { csvParse } from "d3-dsv";
 import { run, mkdir } from "./utils.js";
 import { fetchJSON, downloadToFile } from "./lib/http.js";
 import { getLayerId, getLayerInfo, getFeatureCount, queryUrl, resolveFields, checkResponse, ArcGISError } from "./lib/arcgis.js";
@@ -8,9 +9,9 @@ import { expandGeoSources } from "./lib/sources.js";
 import { cli, selectGeos, isSelection } from "./lib/cli.js";
 import geo_config from "../config/geo-config.js";
 import { tagFor, assetUrl, getManifest, sha256File } from "./lib/archive.js";
-import { readRecord, recordDownload, recordedOtherSource } from "./lib/local-sources.js";
+import { readRecord, recordDownload, recordedOtherSource, sourceOf } from "./lib/local-sources.js";
 import { cleanFeature, writeCleanFeatures } from "./lib/features.js";
-import { writeLookup } from "./lib/lookups.js";
+import { writeLookup, joinColumns } from "./lib/lookups.js";
 
 const usage = `Usage: npm run download-files -- [--geo ltla,wd] [--year 2025] [--force] [--source geoportal]
   --geo, --year  only download boundaries/centroids for these geographies and years
@@ -80,27 +81,44 @@ const bulkUrls = (item, layer, format) => [
   `https://hub.arcgis.com/api/download/v1/items/${item}/${format}?redirect=true&layers=${layer}&spatialRefId=4326`
 ];
 
-// Download a Geoportal table (eg. the NSPL) as one CSV, check its row count against the
-// API, and save it (gzipped if the name ends in .gz), keeping only file.columns if set
-async function downloadLookup(file, path) {
-  const layer = await getLayerId(file.id);
-  const info = await getLayerInfo(file.id, layer);
-  const expected = await getFeatureCount(file.id, layer);
-  if (!info.serviceItemId) throw new Error(`No downloadable file for ${file.id}`);
-  const temp = {csv: `${path}.download.csv`, out: `${path}.part`};
-  console.log(`Downloading ${expected.toLocaleString()} rows from ${file.id} as a single file`);
-  try {
-    const urls = bulkUrls(info.serviceItemId, layer, "csv");
-    for (const [i, url] of urls.entries()) {
-      try {
-        await downloadToFile(url, temp.csv, {retries: 1});
-        if (!looksLikeCsv(temp.csv)) throw new Error("the download wasn't a CSV file");
-        break;
-      } catch (err) {
-        if (i === urls.length - 1) throw err;
-      }
+// Download a Geoportal table as one CSV file, returning the number of rows the API says
+// it has
+async function downloadTable(id, path) {
+  const layer = await getLayerId(id);
+  const info = await getLayerInfo(id, layer);
+  const expected = await getFeatureCount(id, layer);
+  if (!info.serviceItemId) throw new Error(`No downloadable file for ${id}`);
+  console.log(`Downloading ${expected.toLocaleString()} rows from ${id} as a single file`);
+  const urls = bulkUrls(info.serviceItemId, layer, "csv");
+  for (const [i, url] of urls.entries()) {
+    try {
+      await downloadToFile(url, path, {retries: 1});
+      if (!looksLikeCsv(path)) throw new Error("the download wasn't a CSV file");
+      break;
+    } catch (err) {
+      if (i === urls.length - 1) throw err;
     }
-    const rows = await writeLookup(temp.csv, temp.out, {columns: file.columns, required: file.required, gzipped: path.endsWith(".gz")});
+  }
+  return expected;
+}
+
+// Download a Geoportal table (eg. the NSPL) as one CSV, check its row count against the
+// API, and save it (gzipped if the name ends in .gz), keeping only file.columns if set.
+// With file.join, columns from a second table are added (eg. each authority's region).
+async function downloadLookup(file, path) {
+  const temp = {csv: `${path}.download.csv`, join: `${path}.join.csv`, out: `${path}.part`};
+  try {
+    let addColumns = {};
+    if (file.join) {
+      const expected = await downloadTable(file.join.id, temp.join);
+      const table = csvParse(readFileSync(temp.join, {encoding: "utf8"}).replace(/^\uFEFF/, ""));
+      if (table.length !== expected) throw new Error(`expected ${expected.toLocaleString()} rows in ${file.join.id} but the file has ${table.length.toLocaleString()}`);
+      const missing = [...Object.values(file.join.on), ...Object.keys(file.join.columns)].filter(c => !table.columns.includes(c));
+      if (missing.length) throw new Error(`Missing columns ${missing.join(", ")} in ${file.join.id} (found ${table.columns.join(", ")})`);
+      addColumns = joinColumns(table, file.join);
+    }
+    const expected = await downloadTable(file.id, temp.csv);
+    const rows = await writeLookup(temp.csv, temp.out, {columns: file.columns, required: file.required, addColumns, gzipped: path.endsWith(".gz")});
     if (rows !== expected) throw new Error(`expected ${expected.toLocaleString()} rows but the file has ${rows.toLocaleString()}`);
     renameSync(temp.out, path);
   } finally {
@@ -242,7 +260,7 @@ async function downloadGeoBulk(file, out_path) {
 
 async function downloadFile(key, file, dir) {
   const name = ["boundaries", "centroids"].includes(key) ? `${file.name}.json.gz` : file.name;
-  const source = file.id || file.href;
+  const source = sourceOf(file);
   // Files at a "latest" URL are checked on every run, using the archive only if that fails
   if (file.href) {
     try {
@@ -294,7 +312,7 @@ async function downloadFiles() {
   }
   if (failures.length > 0) {
     console.error(`\n${failures.length} file(s) failed to download:`);
-    for (const {file, err} of failures) console.error(`  ${file.name} (${file.id || file.href}): ${err.message}`);
+    for (const {file, err} of failures) console.error(`  ${file.name} (${sourceOf(file)}): ${err.message}`);
     process.exit(1);
   }
   console.log("All files downloaded.");

@@ -6,6 +6,10 @@
 import { existsSync, readFileSync, writeFileSync, renameSync } from "fs";
 import { files } from "../../config/paths.js";
 
+// The dataset(s) a file is made from, as recorded: a lookup with a join (see
+// config/source-files.js) is made from two tables
+export const sourceOf = (file) => file.join ? `${file.id} + ${file.join.id}` : file.id || file.href;
+
 export function readRecord(path = files.sourceRecord) {
   return existsSync(path) ? JSON.parse(readFileSync(path, {encoding: "utf8"})) : {};
 }

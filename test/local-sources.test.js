@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { readRecord, recordDownload, recordedOtherSource } from "../scripts/lib/local-sources.js";
+import { readRecord, recordDownload, recordedOtherSource, sourceOf } from "../scripts/lib/local-sources.js";
 
 test("the source record notes where each file came from, and spots changed datasets", () => {
   const dir = mkdtempSync(join(tmpdir(), "geo-scripts-"));
@@ -23,4 +23,10 @@ test("the source record notes where each file came from, and spots changed datas
   } finally {
     rmSync(dir, {recursive: true, force: true});
   }
+});
+
+test("a lookup with a joined table is recorded as coming from both tables", () => {
+  assert.equal(sourceOf({id: "WD_MAY_2025_UK_BFC"}), "WD_MAY_2025_UK_BFC");
+  assert.equal(sourceOf({href: "https://example.test/latest.csv"}), "https://example.test/latest.csv");
+  assert.equal(sourceOf({id: "OA_LSOA_MSOA_EW_DEC_2021_LU_v3", join: {id: "LAD22_RGN22_EN_LU"}}), "OA_LSOA_MSOA_EW_DEC_2021_LU_v3 + LAD22_RGN22_EN_LU");
 });
