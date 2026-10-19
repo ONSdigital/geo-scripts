@@ -1,6 +1,6 @@
 // A record of which dataset each downloaded source file came from (input/sources.json).
 // Local files keep the same name when config/source-files.js points them at a different
-// dataset, so this is how download-files knows to replace them, and how archive-sources
+// dataset, so this is how download-files knows to replace them, and how archive-files
 // avoids archiving a file under the wrong source. Files downloaded before the record
 // existed have no entry, and are assumed to match the config.
 import { existsSync, readFileSync, writeFileSync, renameSync } from "fs";

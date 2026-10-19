@@ -16,7 +16,7 @@ import { withRetry } from "./lib/http.js";
 import { readRecord, recordedOtherSource } from "./lib/local-sources.js";
 import { MANIFEST, tagFor, getManifest, sha256File, updateManifest } from "./lib/archive.js";
 
-const usage = `Usage: npm run archive-sources -- [--geo wd] [--year 2025] [--lookups] [--dry-run]
+const usage = `Usage: npm run archive-files -- [--geo wd] [--year 2025] [--lookups] [--dry-run]
   --geo, --year  only archive boundaries/centroids for these geographies and years
   --lookups      also archive the lookups (census lookup, NSPL, MSOA names), which are
                  included when there's no selection. Changed files replace the archived ones.

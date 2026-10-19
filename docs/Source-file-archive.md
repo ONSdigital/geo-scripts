@@ -24,18 +24,18 @@ There is one version of each file. When a file is corrected or replaced, the arc
 
 To ignore the archive and download from the Geoportal, add `--source geoportal`.
 
-`download-files` records which dataset each file came from in `input/sources.json`. If `config/source-files.js` is changed to use a different dataset for a file, the file is downloaded again, and an archived copy from a different dataset isn't used. `archive-sources` won't archive a file that was downloaded from a different dataset than the config now lists.
+`download-files` records which dataset each file came from in `input/sources.json`. If `config/source-files.js` is changed to use a different dataset for a file, the file is downloaded again, and an archived copy from a different dataset isn't used. `archive-files` won't archive a file that was downloaded from a different dataset than the config now lists.
 
 ## Archiving files
 
 To archive files, you need write access to the archive repository and the [GitHub CLI](https://cli.github.com/) installed and logged in (`gh auth login`). Then run:
 
 ```bash
-npm run archive-sources -- --geo wd --year 2026 --dry-run   # see what would be uploaded
-npm run archive-sources -- --geo wd --year 2026
+npm run archive-files -- --geo wd --year 2026 --dry-run   # see what would be uploaded
+npm run archive-files -- --geo wd --year 2026
 ```
 
-Only files that are new or have changed are uploaded. Each release's `manifest.json` is uploaded last, so it only ever lists files that are in place. (`archive-sources` reads the existing manifests through the GitHub API, because the public download links can take a few minutes to show newly uploaded files. Until then, `download-files` may still use the Geoportal for those files.)
+Only files that are new or have changed are uploaded. Each release's `manifest.json` is uploaded last, so it only ever lists files that are in place. (`archive-files` reads the existing manifests through the GitHub API, because the public download links can take a few minutes to show newly uploaded files. Until then, `download-files` may still use the Geoportal for those files.)
 
 Without `--geo`/`--year`, every downloaded source file is archived, including the lookups (add `--lookups` to include those with a selection).
 
@@ -43,7 +43,7 @@ Without `--geo`/`--year`, every downloaded source file is archived, including th
 
 1. Run `npm run check-sources` and add the suggested entry to `config/source-files.js` (see the [README](../README.md#updating-the-config-files)).
 2. Download it from the Geoportal: `npm run download-files -- --geo wd --year 2026`
-3. Archive it: `npm run archive-sources -- --geo wd --year 2026`
+3. Archive it: `npm run archive-files -- --geo wd --year 2026`
 
 ### Replacing a file
 
@@ -51,7 +51,7 @@ If a dataset has been corrected on the Geoportal, or a better dataset is found, 
 
 ```bash
 npm run download-files -- --geo wd --year 2025 --source geoportal --force
-npm run archive-sources -- --geo wd --year 2025
+npm run archive-files -- --geo wd --year 2025
 ```
 
 Use `--source geoportal` in the first step: otherwise `download-files` would replace your new download with the archived copy.

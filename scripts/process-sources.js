@@ -1,6 +1,6 @@
 // Downloads and processes the source files, running these steps in order and stopping
 // at the first failure:
-//   download-files → archive-sources → make-virtual-boundaries → get-metadata →
+//   download-files → archive-files → make-virtual-boundaries → get-metadata →
 //   get-relations → get-best-fits
 // These produce the processed boundaries and the master and best-fit lookups. The
 // outputs (make-lists, make-geos, make-vtiles, make-postcodes, make-search-tiles, ...)
@@ -28,7 +28,7 @@ const geoOnly = opts.geo ? ["--geo", opts.geo.join(",")] : [];
 // [script, args, whether the run can continue if it fails]
 const steps = [
   ["download-files", selection],
-  ...(opts["no-archive"] ? [] : [["archive-sources", selection, true]]),
+  ...(opts["no-archive"] ? [] : [["archive-files", selection, true]]),
   ["make-virtual-boundaries", []],
   ["get-metadata", []],
   ["get-relations", []],

@@ -37,7 +37,7 @@ Then see [Deploying to S3](docs/Deploying-to-S3.md) to publish the outputs.
 | 1 | `npm run check-sources` | Optional. Reports new, changed or retired source datasets |
 | 2 | `npm run process-sources` | Runs, in order: |
 |   | ↳ `download-files` | Downloads the boundaries, centroids and lookups (from the archive or the Geoportal) |
-|   | ↳ `archive-sources` | Archives new or changed source files (needs write access; skipped with a warning otherwise) |
+|   | ↳ `archive-files` | Archives new or changed source files (needs write access; skipped with a warning otherwise) |
 |   | ↳ `make-virtual-boundaries` | Makes the UK, Great Britain and England and Wales boundaries |
 |   | ↳ `get-metadata` | Area names, areas, centroids and start/end years |
 |   | ↳ `get-relations` | Parents and successors, written to the master lookup (`/input/lookups/lookup.csv`) |
@@ -66,7 +66,7 @@ npm run process-sources -- --geo wd
 | ------ | ------- |
 | process-sources | `--geo`, `--year` (passed on to the steps that support them), `--no-archive` |
 | download-files | `--geo`, `--year`, `--force` (download again), `--source geoportal` (skip the archive) |
-| archive-sources | `--geo`, `--year`, `--lookups` (include the lookups), `--dry-run` |
+| archive-files | `--geo`, `--year`, `--lookups` (include the lookups), `--dry-run` |
 | make-lists | `--geo`, `--year` |
 | get-best-fits, make-geos, make-cm-geos | `--geo` only, because their outputs combine every year of a geography. `make-geos --clean` deletes the selected types' files first. |
 | make-vtiles | `--geo`, `--year` (tileset keys from `vtiles-config.js`), `--force` (remake) |
@@ -98,11 +98,11 @@ This checks every dataset in `/config/source-files.js` against the Geoportal, su
 
 This script will download and transform boundary and lookup files from the ONS Open Geography Portal, as well as MSOA Names from the House of Commons Library. Lookups (the census lookup, the National Statistics Postcode Lookup and the MSOA names) are saved to `/input/sources`, and only their current version is kept: `npm run check-sources` reports new NSPL editions, and the MSOA names are checked for changes on every run. The config can be found at `/config/source-files.js`.
 
-Files are downloaded from the [source file archive](docs/Source-file-archive.md) (GitHub releases in [ONSdigital/geo-source-files](https://github.com/ONSdigital/geo-source-files/releases)) when it has them, so that everyone uses the same files even after the Geoportal retires a dataset; other files come from the Geoportal. Add `--source geoportal` to skip the archive. New or corrected files are added to the archive with `npm run archive-sources` (see the [archive docs](docs/Source-file-archive.md)).
+Files are downloaded from the [source file archive](docs/Source-file-archive.md) (GitHub releases in [ONSdigital/geo-source-files](https://github.com/ONSdigital/geo-source-files/releases)) when it has them, so that everyone uses the same files even after the Geoportal retires a dataset; other files come from the Geoportal. Add `--source geoportal` to skip the archive. New or corrected files are added to the archive with `npm run archive-files` (see the [archive docs](docs/Source-file-archive.md)).
 
 Boundaries are downloaded from the Geoportal as single pre-built files, which is much faster than paging through its API (the API is used if that fails). Files that have already been downloaded are skipped. Failed requests are retried. If a file can't be downloaded, the script carries on with the others, lists the failures at the end, and exits with an error; no partial files are left behind. If a dataset is reported as unavailable, run `npm run check-sources` to find its replacement.
 
-### archive-sources
+### archive-files
 
 This script uploads new or changed source files to the [source file archive](docs/Source-file-archive.md), so that they stay available to everyone after the Geoportal retires them. It needs the [GitHub CLI](https://cli.github.com/) logged in with write access to the archive repository; without it, `process-sources` skips this step with a warning.
 
