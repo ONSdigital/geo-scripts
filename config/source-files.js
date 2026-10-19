@@ -168,7 +168,14 @@ export default {
       buc: "Travel_to_Work_Areas_Dec_2011_UGCB_in_United_Kingdom_2022",
     }},
     {key: "bua", year: 2022, code: "BUA", ids: {
+      // Built-up areas are only published at one detail level, BGG (grid generalised),
+      // which is used as BFC
       bfc: "BUA_2022_GB",
+    }},
+    {key: "bua", year: 2024, code: "BUA", ids: {
+      // December 2024, England and Wales extent (we only use English, Welsh and
+      // cross-border areas); every area has a new code
+      bfc: "main_ONS_BUA_2024_EW_V2",
     }},
     {key: "msoa", year: 2021, code: "MSOA", ids: {
       bfe: "Middle_layer_Super_Output_Areas_December_2021_Boundaries_EW_BFE_V8",
