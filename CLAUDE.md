@@ -16,7 +16,7 @@ npm test                                  # all tests
 node --test test/spatial.test.js          # one test file
 npm run <script-name> -- --help           # each script is `node ./scripts/<script-name>.js`
 npm run make-geos -- --geo ltla,wd        # limit a script to some geographies (and --year where supported)
-npm run run-all -- --geo wd               # scripts/run-all.js: download-files → archive-sources (optional) → make-virtual-boundaries → get-metadata → get-relations → make-lists → get-best-fits
+npm run process-sources -- --geo wd       # scripts/process-sources.js: download-files → archive-sources (optional) → make-virtual-boundaries → get-metadata → get-relations → get-best-fits
 npm run check-sources                     # check config/source-files.js against the Geoportal; suggest replacements and new releases
 npm run archive-sources -- --geo wd --year 2026 --dry-run   # upload source files to the GitHub release archive (needs gh)
 tileserver-gl-light ./output/vtiles/{file}.mbtiles   # preview vector tiles (separate global install)
@@ -38,7 +38,7 @@ Scripts must run in dependency order. They talk to each other through files in `
 
 `get-metadata`, `get-relations` and `make-search-tiles` always need every geography and refuse `--geo`/`--year`. A selected `get-best-fits` run merges into the existing best-fit JSON files.
 
-`make-geos` (step 6) and these large outputs aren't part of `run-all`; each depends only on the data `run-all` prepares, not on the others, apart from the follow-on steps noted (`make-cm-geos`/`check-centroids` after `make-geos`, `zip-vtiles` after the tile scripts):
+`make-lists` (step 4), `make-geos` (step 6) and these large outputs aren't part of `process-sources`; each depends only on the data `process-sources` produces, not on the others, apart from the follow-on steps noted (`make-cm-geos`/`check-centroids` after `make-geos`, `zip-vtiles` after the tile scripts):
 - **make-vtiles** (`config/vtiles-config.js` + `config/vtiles-detail.js`): one Tippecanoe run per detail level/zoom band, joined with `tile-join` and given attributes from `lookup_names.csv` (and an optional `metadata` CSV) → `output/vtiles/{key}{YY}.mbtiles`. Intermediate files go in `temp/`, which is cleared when all outputs exist.
 - **make-oa-vtiles-lookups** → **make-oa-vtiles**: OA tiles where small OAs are explicitly dissolved into their LSOA/MSOA parents at low zooms (uses mapshaper).
 - **zip-vtiles**: `tile-join -e` unpacks each mbtiles into `{z}/{x}/{y}.pbf` directories, which are then zipped for static hosting on S3/CDN.
