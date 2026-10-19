@@ -19,6 +19,7 @@ npm run make-geos -- --geo ltla,wd        # limit a script to some geographies (
 npm run process-sources -- --geo wd       # scripts/process-sources.js: download-files → archive-files (optional) → make-virtual-boundaries → get-metadata → get-relations → get-best-fits
 npm run check-sources                     # check config/source-files.js against the Geoportal; suggest replacements and new releases
 npm run archive-files -- --geo wd --year 2026 --dry-run   # upload source files to the GitHub release archive (needs gh)
+npm run archive-files -- --prune --dry-run                 # also remove archived files/releases the config no longer names
 tileserver-gl-light ./output/vtiles/{file}.mbtiles   # preview vector tiles (separate global install)
 ```
 

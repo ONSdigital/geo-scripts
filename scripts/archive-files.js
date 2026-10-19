@@ -1,7 +1,8 @@
 // Uploads local source files to the source file archive (GitHub releases, see
 // config/archive.js), so that they stay available if the Geoportal retires them.
 // Only new or changed files are uploaded, replacing the archived copy, and each
-// release's manifest.json (checksums) is uploaded last.
+// release's manifest.json (checksums) is uploaded last. With --prune, files and releases
+// the config no longer names are then removed, so the archive matches the config.
 //
 // Needs the GitHub CLI (gh), logged in with write access to the archive repo.
 import { existsSync, statSync, writeFileSync } from "fs";
@@ -14,25 +15,34 @@ import { cli, selectGeos, isSelection } from "./lib/cli.js";
 import { expandGeoSources } from "./lib/sources.js";
 import { withRetry } from "./lib/http.js";
 import { readRecord, recordedOtherSource, sourceOf } from "./lib/local-sources.js";
-import { MANIFEST, tagFor, getManifest, sha256File, updateManifest } from "./lib/archive.js";
+import { MANIFEST, tagFor, getManifest, sha256File, updateManifest, planPrune } from "./lib/archive.js";
 
-const usage = `Usage: npm run archive-files -- [--geo wd] [--year 2025] [--lookups] [--dry-run]
+const usage = `Usage: npm run archive-files -- [--geo wd] [--year 2025] [--lookups] [--prune] [--dry-run]
   --geo, --year  only archive boundaries/centroids for these geographies and years
   --lookups      also archive the lookups (census lookup, NSPL, MSOA names), which are
                  included when there's no selection. Changed files replace the archived ones.
-  --dry-run      show what would be uploaded without uploading anything`;
+  --prune        then remove files that config/source-files.js doesn't name from the selected
+                 releases (eg. after a file is renamed), and without a selection, remove
+                 releases for geographies/years that are no longer configured
+  --dry-run      show what would be uploaded (and removed) without changing anything`;
 const {opts, selected} = cli(usage, opts => selectGeos(geo_config, opts), {
   lookups: {type: "boolean", default: false},
+  prune: {type: "boolean", default: false},
   "dry-run": {type: "boolean", default: false}
 });
 const dryRun = opts["dry-run"];
 const isSelected = (file) => selected.some(g => g.key === file.key && g.years.includes(file.year));
 
-// Local source files, with their archive release
+// Every configured source file, and the selected ones
+const lookups = source_files.lookups.map(f => ({...f, path: `${dirs.sources}/${f.name}`}));
+const configured = [
+  ...expandGeoSources(source_files.boundaries).map(f => ({...f, name: `${f.name}.json.gz`, path: `${dirs.boundaries}/${f.name}.json.gz`})),
+  ...expandGeoSources(source_files.centroids).map(f => ({...f, name: `${f.name}.json.gz`, path: `${dirs.centroids}/${f.name}.json.gz`})),
+  ...lookups
+];
 const files = [
-  ...expandGeoSources(source_files.boundaries).filter(isSelected).map(f => ({...f, name: `${f.name}.json.gz`, path: `${dirs.boundaries}/${f.name}.json.gz`})),
-  ...expandGeoSources(source_files.centroids).filter(isSelected).map(f => ({...f, name: `${f.name}.json.gz`, path: `${dirs.centroids}/${f.name}.json.gz`})),
-  ...(!isSelection(opts) || opts.lookups ? source_files.lookups.map(f => ({...f, path: `${dirs.sources}/${f.name}`})) : [])
+  ...configured.filter(f => f.key && f.year && isSelected(f)),
+  ...(!isSelection(opts) || opts.lookups ? lookups : [])
 ];
 
 const byTag = new Map();
@@ -58,7 +68,7 @@ try {
   await run("gh auth status");
 } catch {
   hasGh = false;
-  if (!dryRun) {
+  if (!dryRun || opts.prune) {
     console.error("The GitHub CLI (gh) needs to be installed and logged in (gh auth login) to upload to the archive.");
     process.exit(1);
   }
@@ -66,12 +76,18 @@ try {
 
 const repo = `-R ${archive.repo}`;
 
+// Run a gh command, retrying network errors (but not a missing release or asset)
+const gh = (args, label) => withRetry(() => run(`gh ${args} ${repo}`).catch(err => {
+  if (/release not found|no assets match/i.test(err.message)) err.retryable = false;
+  throw err;
+}), {label});
+
 // A release's current manifest, or null if there isn't one. This goes through the GitHub
 // API: the public download URL can lag behind just after an upload, and merging into an
 // out-of-date manifest would drop files from it.
 async function readManifest(tag) {
   try {
-    return JSON.parse(await run(`gh release download "${tag}" ${repo} --pattern ${MANIFEST} --output -`));
+    return JSON.parse(await gh(`release download "${tag}" --pattern ${MANIFEST} --output -`, `Reading ${tag}/${MANIFEST}`));
   } catch (err) {
     if (/release not found|no assets match/i.test(err.message)) return null;
     throw err;
@@ -135,3 +151,57 @@ for (const [tag, tagFiles] of byTag) {
 }
 
 console.log(dryRun ? "Dry run complete - nothing was uploaded." : `Uploaded ${uploads} file(s) to https://github.com/${archive.repo}/releases`);
+
+// Remove what the config no longer names: from the selected releases, or from the whole
+// archive when there's no selection
+if (opts.prune) {
+  const all = !isSelection(opts);
+  const names = new Map();
+  for (const file of configured) {
+    const tag = tagFor(file);
+    if (!names.has(tag)) names.set(tag, new Set());
+    names.get(tag).add(file.name);
+  }
+  const scope = all ? names : new Map([...new Set(files.map(tagFor))].map(tag => [tag, names.get(tag)]));
+  const tags = all ?
+    JSON.parse(await gh("release list --limit 1000 --json tagName", "Listing releases")).map(r => r.tagName) :
+    [...scope.keys()];
+
+  const archived = new Map();
+  for (const tag of tags) {
+    let assets;
+    try {
+      assets = JSON.parse(await gh(`release view "${tag}" --json assets`, `Listing ${tag}`)).assets.map(a => a.name);
+    } catch (err) {
+      if (/release not found/i.test(err.message)) continue;
+      throw err;
+    }
+    archived.set(tag, {assets, manifest: await readManifest(tag)});
+  }
+
+  const plan = planPrune(scope, archived, {all});
+  const verb = dryRun ? "Would remove" : "Removing";
+  if (!plan.releases.length && !plan.assets.length && !plan.manifests.length) console.log("Nothing to prune: the archive matches the config.");
+  for (const {tag, name} of plan.assets) console.log(`${verb} ${tag}/${name}`);
+  for (const {tag, manifest} of plan.manifests) console.log(`${dryRun ? "Would update" : "Updating"} ${tag}/${MANIFEST} (${Object.keys(manifest.files).length} file(s))`);
+  for (const tag of plan.releases) console.log(`${verb} the release ${tag} and its tag (not in the config)`);
+
+  if (!dryRun) {
+    // Manifests first, so that they never list a file that has been removed
+    for (const {tag, manifest} of plan.manifests) {
+      mkdir(`${tempDir}/${tag}`);
+      const manifestPath = `${tempDir}/${tag}/${MANIFEST}`;
+      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      await upload(tag, manifestPath);
+    }
+    for (const {tag, name} of plan.assets) {
+      await gh(`release delete-asset "${tag}" "${name}" --yes`, `Removal of ${tag}/${name}`);
+    }
+    for (const tag of plan.releases) {
+      await gh(`release delete "${tag}" --cleanup-tag --yes`, `Removal of ${tag}`);
+    }
+    console.log(`Removed ${plan.assets.length} file(s) and ${plan.releases.length} release(s).`);
+  } else {
+    console.log("Dry run - nothing was removed.");
+  }
+}

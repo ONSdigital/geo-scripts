@@ -46,3 +46,32 @@ export function updateManifest(existing, tag, entries) {
     files: {...(existing?.files || {}), ...entries}
   };
 }
+
+// What to remove so that the archive holds only the files the config names. configured
+// maps each tag in scope to the names of its configured files, and archived maps each
+// release to {assets: [names], manifest}. Releases outside configured are left alone,
+// unless the whole archive is in scope (all), when they're removed. Returns
+// {releases: [tags], assets: [{tag, name}], manifests: [{tag, manifest}]}, where the
+// manifests have entries only for configured files that are in the release.
+export function planPrune(configured, archived, {all = false} = {}) {
+  const plan = {releases: [], assets: [], manifests: []};
+  for (const [tag, {assets, manifest}] of archived) {
+    const names = configured.get(tag);
+    if (!names) {
+      if (all) plan.releases.push(tag);
+      continue;
+    }
+    const kept = new Set();
+    for (const name of assets) {
+      if (name === MANIFEST) continue;
+      if (names.has(name)) kept.add(name);
+      else plan.assets.push({tag, name});
+    }
+    const entries = Object.entries(manifest?.files || {});
+    if (entries.some(([name]) => !kept.has(name))) {
+      const files = Object.fromEntries(entries.filter(([name]) => kept.has(name)));
+      plan.manifests.push({tag, manifest: {...manifest, updated: new Date().toISOString(), files}});
+    }
+  }
+  return plan;
+}

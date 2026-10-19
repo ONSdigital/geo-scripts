@@ -12,7 +12,7 @@ Release assets can be up to 2 GB each, so the 100 MB limit on files committed to
 - **The `lookups` release** holds the census lookup, the NSPL (the full CSV, gzipped) and the MSOA names. Only the current version of each is kept: a new NSPL edition, or an updated version of the MSOA names, replaces the archived one.
 - **Each release has a `manifest.json`,** listing every file's SHA-256 checksum, size, source dataset and the date it was archived.
 
-There is one version of each file. When a file is corrected or replaced, the archived copy is overwritten under the same tag; superseded versions aren't kept.
+There is one version of each file. When a file is corrected or replaced, the archived copy is overwritten under the same tag; superseded versions aren't kept. Each release should hold exactly the files that `config/source-files.js` names for it (see [Removing files](#removing-files)). If versioned releases are needed in future, they should get their own tags rather than sharing one.
 
 ## Downloading
 
@@ -55,3 +55,14 @@ npm run archive-files -- --geo wd --year 2025
 ```
 
 Use `--source geoportal` in the first step: otherwise `download-files` would replace your new download with the archived copy.
+
+### Removing files
+
+`archive-files` only adds and replaces files. When a file is renamed or removed from `config/source-files.js` (eg. the census lookup, renamed when its region column was added), the old file stays in the archive until you prune it:
+
+```bash
+npm run archive-files -- --prune --dry-run   # see what would be removed
+npm run archive-files -- --prune
+```
+
+With `--prune`, after uploading, `archive-files` removes from each release any file the config doesn't name for it, and the file's entry in that release's `manifest.json`. The manifest is updated first, so it never lists a removed file. Without `--geo`/`--year`, it also deletes any release (and its tag) for a geography and year that's no longer in the config. With a selection, only the selected releases are pruned. Files the config names are never removed, even if they haven't been downloaded locally.

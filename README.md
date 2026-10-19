@@ -66,7 +66,7 @@ npm run process-sources -- --geo wd
 | ------ | ------- |
 | process-sources | `--geo`, `--year` (passed on to the steps that support them), `--no-archive` |
 | download-files | `--geo`, `--year`, `--force` (download again), `--source geoportal` (skip the archive) |
-| archive-files | `--geo`, `--year`, `--lookups` (include the lookups), `--dry-run` |
+| archive-files | `--geo`, `--year`, `--lookups` (include the lookups), `--prune` (remove files and releases the config no longer names), `--dry-run` |
 | make-lists | `--geo`, `--year` |
 | get-best-fits, make-geos, make-cm-geos | `--geo` only, because their outputs combine every year of a geography. `make-geos --clean` deletes the selected types' files first. |
 | make-vtiles | `--geo`, `--year` (tileset keys from `vtiles-config.js`), `--force` (remake) |

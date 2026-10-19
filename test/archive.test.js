@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { tagFor, assetUrl, sha256File, getManifest, updateManifest } from "../scripts/lib/archive.js";
+import { tagFor, assetUrl, sha256File, getManifest, updateManifest, planPrune } from "../scripts/lib/archive.js";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -48,4 +48,37 @@ test("updateManifest keeps existing entries and replaces changed ones", () => {
   const updated = updateManifest(existing, "wd-2025", {"b.json.gz": {sha256: "3"}, "c.json.gz": {sha256: "4"}});
   assert.equal(updated.tag, "wd-2025");
   assert.deepEqual(updated.files, {"a.json.gz": {sha256: "1"}, "b.json.gz": {sha256: "3"}, "c.json.gz": {sha256: "4"}});
+});
+
+test("planPrune removes files and releases the config no longer names", () => {
+  const configured = new Map([
+    ["lookups", new Set(["oa21_lsoa21_msoa21_ltla22_rgn22.csv", "nspl.csv.gz", "msoa_names.csv"])],
+    ["wd-2025", new Set(["wd25_bfc.json.gz", "wd25_bgc.json.gz"])]
+  ]);
+  const entry = {sha256: "abc"};
+  const archived = new Map([
+    // A renamed file: the old name is still in the release and its manifest
+    ["lookups", {
+      assets: ["manifest.json", "msoa_names.csv", "nspl.csv.gz", "oa21_lsoa21_msoa21_ltla22.csv", "oa21_lsoa21_msoa21_ltla22_rgn22.csv"],
+      manifest: {tag: "lookups", files: {"oa21_lsoa21_msoa21_ltla22.csv": entry, "nspl.csv.gz": entry, "msoa_names.csv": entry, "oa21_lsoa21_msoa21_ltla22_rgn22.csv": entry}}
+    }],
+    // Up to date, apart from a configured file that hasn't been archived yet
+    ["wd-2025", {assets: ["manifest.json", "wd25_bfc.json.gz"], manifest: {files: {"wd25_bfc.json.gz": entry}}}],
+    // A geography/year that's no longer configured
+    ["wd-2019", {assets: ["manifest.json", "wd19_bfc.json.gz"], manifest: {files: {"wd19_bfc.json.gz": entry}}}]
+  ]);
+
+  const plan = planPrune(configured, archived, {all: true});
+  assert.deepEqual(plan.releases, ["wd-2019"]);
+  assert.deepEqual(plan.assets, [{tag: "lookups", name: "oa21_lsoa21_msoa21_ltla22.csv"}]);
+  assert.equal(plan.manifests.length, 1);
+  assert.equal(plan.manifests[0].tag, "lookups");
+  assert.deepEqual(Object.keys(plan.manifests[0].manifest.files).sort(), ["msoa_names.csv", "nspl.csv.gz", "oa21_lsoa21_msoa21_ltla22_rgn22.csv"]);
+
+  // With a selection, releases outside it are left alone
+  assert.deepEqual(planPrune(configured, archived).releases, []);
+
+  // A manifest entry whose file is missing from the release is dropped
+  const missing = new Map([["wd-2025", {assets: ["manifest.json"], manifest: {files: {"wd25_bfc.json.gz": entry}}}]]);
+  assert.deepEqual(planPrune(configured, missing).manifests[0].manifest.files, {});
 });
