@@ -18,25 +18,38 @@ In addition, the scripts use commands including **zip**, **unzip**, **gzip** and
 
 ## Running the scripts
 
-In order to run the scripts in this repo, you will first need to install the NodeJS depenencies:
+First install the NodeJS dependencies:
 
 ```bash
 npm install
 ```
 
-You can then run each of the scripts below using the following command:
+Each script is then run with `npm run {script-name}`. The work happens in three stages:
 
-```bash
-npm run {script-name}
-```
+1. **Check the source files** (optional): `npm run check-sources` looks for new, changed or retired datasets on the Geoportal, so you can update `/config/source-files.js` first.
+2. **Prepare the data**: `npm run run-all` downloads and archives the source files, then generates the master lookup, area lists and best-fit lookups. These steps must run in order, and `run-all` stops at the first one that fails.
+3. **Make the outputs** you need: area metadata files, vector tiles, postcode lookups and search tiles. These are large and slow to generate, so they're left out of `run-all`. Each depends only on the prepared data, not on the others, so run whichever you need, in any order or in parallel.
 
-It is important that the first four scripts (download-files, make-virtual-boundaries, get-metadata and get-relations) are run in order before running the rest of the scripts, because they download and pre-process the necessary source files.
+Then see [Deploying to S3](docs/Deploying-to-S3.md) to publish the outputs.
 
-Alternatively, you can run all of the scripts - other than the vector tiles, postcode and search tiles scripts - by running the following command. It stops at the first step that fails:
+| Stage | Command | What it does |
+| ----- | ------- | ------------ |
+| 1 | `npm run check-sources` | Optional. Reports new, changed or retired source datasets |
+| 2 | `npm run run-all` | Runs, in order: |
+|   | ↳ `download-files` | Downloads the boundaries, centroids and lookups (from the archive or the Geoportal) |
+|   | ↳ `archive-sources` | Archives new or changed source files (needs write access; skipped with a warning otherwise) |
+|   | ↳ `make-virtual-boundaries` | Makes the UK, Great Britain and England and Wales boundaries |
+|   | ↳ `get-metadata` | Area names, areas, centroids and start/end years |
+|   | ↳ `get-relations` | Parents and successors, written to the master lookup (`/input/lookups/lookup.csv`) |
+|   | ↳ `make-lists` | Area lists (`/output/lists`) |
+|   | ↳ `get-best-fits` | Census 2021 best-fit lookups |
+| 3 | `npm run make-geos` | Area metadata files (then `make-cm-geos` for Census Maps, and `check-centroids` to check them) |
+|   | `npm run make-vtiles` | Vector tiles (then `zip-vtiles` to package them) |
+|   | `npm run make-oa-vtiles-lookups`, then `make-oa-vtiles` | Output Area vector tiles |
+|   | `npm run make-postcodes` | Postcode lookup files |
+|   | `npm run make-search-tiles` | GeoJSON search tiles |
 
-```bash
-npm run all-scripts
-```
+Each step of `run-all` can also be run on its own (eg. `npm run make-lists`), as long as the steps before it have been run.
 
 ### Choosing which geographies to process
 
@@ -46,11 +59,12 @@ Many scripts accept `--geo` and `--year` options, so you can update one geograph
 npm run download-files -- --geo wd --year 2026
 npm run make-geos -- --geo ltla,wd
 npm run make-vtiles -- --geo wd --year 2026
-npm run all-scripts -- --geo wd
+npm run run-all -- --geo wd
 ```
 
 | Script | Options |
 | ------ | ------- |
+| run-all | `--geo`, `--year` (passed on to the steps that support them), `--no-archive` |
 | download-files | `--geo`, `--year`, `--force` (download again), `--source geoportal` (skip the archive) |
 | archive-sources | `--geo`, `--year`, `--lookups` (include the lookups), `--dry-run` |
 | make-lists | `--geo`, `--year` |
@@ -60,7 +74,15 @@ npm run all-scripts -- --geo wd
 
 Add `--help` to any of these to see its options.
 
-### Checking for new or retired source files
+### Tests
+
+```bash
+npm test
+```
+
+The tests (in `/test`) cover the shared functions in `/scripts/lib` and the consistency of the config files. They don't need the input data or network access.
+
+## Stage 1: checking the source files
 
 The Geoportal sometimes retires datasets or re-publishes them under new names (eg. with a `_V2` suffix), which breaks the downloads. Run:
 
@@ -70,13 +92,7 @@ npm run check-sources
 
 This checks every dataset in `/config/source-files.js` against the Geoportal, suggests replacements for any that are missing or out of date, and lists newer releases as entries ready to paste into the config. Boundaries and codes change at most once a year, so each calendar year should use the most recent release published in it: the script suggests one release per year, covering both new years and later releases within years already in the config (eg. December rather than May). A new year is only worth adding if areas have actually changed: new codes (eg. mergers or boundary changes) or new names (renamed areas keep their code). So the script compares each new release's area codes and names with the latest year in the master lookup, without downloading any boundaries. New years with the same codes and names are listed as skipped. Suggestions are checked to have the expected fields, but always review them before using them.
 
-### Tests
-
-```bash
-npm test
-```
-
-The tests (in `/test`) cover the shared functions in `/scripts/lib` and the consistency of the config files. They don't need the input data or network access.
+## Stage 2: preparing the data (`npm run run-all`)
 
 ### download-files
 
@@ -85,6 +101,10 @@ This script will download and transform boundary and lookup files from the ONS O
 Files are downloaded from the [source file archive](docs/Source-file-archive.md) (GitHub releases in [ONSdigital/geo-source-files](https://github.com/ONSdigital/geo-source-files/releases)) when it has them, so that everyone uses the same files even after the Geoportal retires a dataset; other files come from the Geoportal. Add `--source geoportal` to skip the archive. New or corrected files are added to the archive with `npm run archive-sources` (see the [archive docs](docs/Source-file-archive.md)).
 
 Boundaries are downloaded from the Geoportal as single pre-built files, which is much faster than paging through its API (the API is used if that fails). Files that have already been downloaded are skipped. Failed requests are retried. If a file can't be downloaded, the script carries on with the others, lists the failures at the end, and exits with an error; no partial files are left behind. If a dataset is reported as unavailable, run `npm run check-sources` to find its replacement.
+
+### archive-sources
+
+This script uploads new or changed source files to the [source file archive](docs/Source-file-archive.md), so that they stay available to everyone after the Geoportal retires them. It needs the [GitHub CLI](https://cli.github.com/) logged in with write access to the archive repository; without it, `run-all` skips this step with a warning.
 
 ### make-virtual-boundaries
 
@@ -107,6 +127,10 @@ This script generates [CSV lists of codes and names](docs/Area-lists.md) for pla
 ### get-best-fits
 
 This script calculates accurate best-fit lookups for every geography based on Output Area, LSOA and MSOA populated-weighted centroids. These lookups are required for the **Build a Custom Area Profile** tool.
+
+## Stage 3: making the outputs
+
+These scripts each depend only on the data prepared in stage 2, so run whichever you need, in any order or in parallel. The only dependencies between them are follow-on steps: `make-cm-geos` and `check-centroids` use the output of `make-geos`, `zip-vtiles` packages the vector tiles, and `make-oa-vtiles` needs `make-oa-vtiles-lookups` first.
 
 ### make-geos
 
@@ -171,8 +195,7 @@ It should be possible to add additional geographies or years by modifying the co
 1. Run `npm run check-sources` and copy the suggested entry for the new year into `/config/source-files.js`. (For a later release within a year already in the config, replace that year's entry instead, and re-download it with `--force`.)
 2. That's the only config change needed: the geography and its tilesets pick up the new year from `/config/source-files.js`.
 3. Run `npm test` to check the config is consistent.
-4. Download the new files with `npm run download-files -- --geo {key} --year {year}`, then run the rest of the pipeline (eg. `npm run all-scripts -- --geo {key}`).
-5. Archive the new files with `npm run archive-sources -- --geo {key} --year {year}` (needs write access to the archive repo; see [Source file archive](docs/Source-file-archive.md)).
+4. Run `npm run run-all -- --geo {key}` to download and archive the new files and regenerate the lookups and lists, then make the outputs you need (stage 3).
 
 ## Editing the scripts
 

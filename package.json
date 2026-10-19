@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
-    "all-scripts": "node ./scripts/run-all.js",
+    "run-all": "node ./scripts/run-all.js",
     "download-files": "node ./scripts/download-files.js",
     "make-virtual-boundaries": "node ./scripts/make-virtual-boundaries.js",
     "get-metadata": "node ./scripts/get-metadata.js",
