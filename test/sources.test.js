@@ -130,3 +130,27 @@ test("checkLookups finds newer editions and versions of lookups", async () => {
     ["nspl", false, "National_Statistics_Postcode_Lookup_(August_2026)_for_the_United_Kingdom_(Hosted_Table)"]
   ]);
 });
+
+test("datasets are matched by title as well as service name", async () => {
+  const { parseDataset, titleToName } = await import("../scripts/lib/sources.js");
+  const titles = new Map([
+    ["main_ONS_BUA_2024_EW_V2", "Built Up Areas (December 2024) Boundaries EW BGG (V2)"],
+    ["BUA_2022_GB", "Built Up Areas (December 2022) Boundaries GB BGG"]
+  ]);
+  assert.equal(titleToName("Built Up Areas (December 2024) Boundaries EW BGG (V2)"), "Built_Up_Areas_December_2024_Boundaries_EW_BGG_V2");
+  // The release comes from the title (BGG is treated as BFC), and either family matches
+  const parsed = parseDataset("main_ONS_BUA_2024_EW_V2", titles);
+  assert.deepEqual(parsed.map(p => [p.name, p.familyKey, p.year, p.month, p.detail, p.version]), [
+    ["main_ONS_BUA_2024_EW_V2", "main_on_bua", 2024, "dec", "bfc", 2],
+    ["main_ONS_BUA_2024_EW_V2", "built_up_area", 2024, "dec", "bfc", 2]
+  ]);
+
+  const manifest = expandGeoSources([{key: "bua", year: 2022, code: "BUA", ids: {bfc: "BUA_2022_GB"}}]);
+  const catalogue = ["BUA_2022_GB", "main_ONS_BUA_2024_EW_V2", "BUA_APR_2024_EW_NC"];
+  assert.deepEqual(checkManifest(manifest, catalogue, titles).map(r => r.status), ["ok"]);
+  assert.deepEqual(findNewReleases(manifest, catalogue, titles).map(r => [r.key, r.year, r.status, r.ids]), [
+    ["bua", 2024, "new", {bfc: "main_ONS_BUA_2024_EW_V2"}]
+  ]);
+  // Without titles, the oddly named 2024 dataset isn't recognised
+  assert.deepEqual(findNewReleases(manifest, catalogue), []);
+});

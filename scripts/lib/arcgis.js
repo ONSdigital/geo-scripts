@@ -117,6 +117,24 @@ export function resolveFields(fields, code, yr) {
   return mapping;
 }
 
+// Titles of the Geoportal's feature services, by service name. Titles follow the naming
+// conventions more consistently than service names (eg. the service
+// "main_ONS_BUA_2024_EW_V2" is titled "Built Up Areas (December 2024) Boundaries EW BGG (V2)").
+export async function listServiceTitles() {
+  const titles = new Map();
+  const query = encodeURIComponent(`orgid:${SERVICES_URL.split("/")[3]} type:"Feature Service"`);
+  for (let start = 1; start > 0;) {
+    const json = await fetchJSON(`https://www.arcgis.com/sharing/rest/search?q=${query}&num=100&start=${start}&f=json`);
+    if (json.error) throw new Error(`Couldn't list dataset titles: ${json.error.message}`);
+    for (const item of json.results) {
+      const name = item.url?.match(/\/services\/([^/]+)\/FeatureServer/)?.[1];
+      if (name) titles.set(decodeURIComponent(name), item.title);
+    }
+    start = json.nextStart;
+  }
+  return titles;
+}
+
 export async function listServices() {
   const json = checkResponse(await fetchJSON(`${SERVICES_URL}?f=json`), "services");
   return json.services.filter(s => s.type === "FeatureServer").map(s => s.name);
@@ -126,7 +144,9 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 const DETAILS = {
   bfe: "bfe", bfc: "bfc", bgc: "bgc", bsc: "bsc", buc: "buc", pwc: "pwc",
   // Older naming conventions
-  feb: "bfe", fcb: "bfc", gcb: "bgc", sgcb: "bsc", ugcb: "buc"
+  feb: "bfe", fcb: "bfc", gcb: "bgc", sgcb: "bsc", ugcb: "buc",
+  // Grid generalised (eg. built-up areas), the most detailed level published for them
+  bgg: "bfc"
 };
 
 // Break a Geoportal service name into its parts, eg.

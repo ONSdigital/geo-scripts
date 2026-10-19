@@ -13,30 +13,53 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 const releaseOrder = (p) => p.year * 12 + (p.month ? MONTHS.indexOf(p.month) : 0);
 const byVersion = (a, b) => b.version - a.version || a.name.localeCompare(b.name);
 
+// A dataset title as a name parseServiceName can read, eg.
+// "Built Up Areas (December 2024) Boundaries EW BGG (V2)" -> "Built_Up_Areas_December_2024_Boundaries_EW_BGG_V2"
+export const titleToName = (title) => title.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+// Parse a dataset by its title as well as its service name (titles, from
+// listServiceTitles, follow the naming conventions more consistently). The release
+// (year, month, detail, version) comes from the title when it can be parsed, and the
+// dataset matches a geography by the family of either. Returns one entry per family.
+export function parseDataset(name, titles = new Map()) {
+  const byName = parseServiceName(name);
+  const title = titles.get(name);
+  const byTitle = title ? parseServiceName(titleToName(title)) : null;
+  const release = byTitle || byName;
+  if (!release) return [];
+  return [byName, byTitle].filter(p => p).map(p => ({...release, name, family: p.family, familyKey: p.familyKey}));
+}
+
+// Parsed datasets with a detail level, excluding variants (eg. names and codes tables)
+const parseCatalogue = (catalogue, titles) =>
+  catalogue.flatMap(name => parseDataset(name, titles)).filter(p => p.detail && !p.variant);
+const uniqueNames = (list) => list.filter((p, i) => list.findIndex(q => q.name === p.name) === i);
+
 // The dataset name prefixes ("families") used for each geography, eg. ltla -> lad,
-// local_authority_districts. Taken from the manifest's own IDs, plus the field code,
-// so a release under a prefix the manifest has never used won't be found.
-export function familiesByKey(files) {
+// local_authority_districts. Taken from the manifest's own IDs and their titles, plus
+// the field code, so a release under a prefix never used for that geography won't be found.
+export function familiesByKey(files, titles) {
   const families = {};
   for (const file of files) {
     families[file.key] ||= new Set();
     families[file.key].add(file.code.toLowerCase().replace(/s$/, ""));
-    const parsed = parseServiceName(file.id);
-    if (parsed) families[file.key].add(parsed.familyKey);
+    for (const parsed of parseDataset(file.id, titles)) families[file.key].add(parsed.familyKey);
   }
   return families;
 }
 
 // Check each manifest file against the catalogue of available dataset names.
 // Returns one result per file: {file, status: "ok" | "missing" | "outdated", candidates}
-export function checkManifest(files, catalogue) {
+export function checkManifest(files, catalogue, titles) {
   const available = new Set(catalogue);
-  const parsed = catalogue.map(parseServiceName).filter(p => p && p.detail && !p.variant);
-  const families = familiesByKey(files);
+  const parsed = parseCatalogue(catalogue, titles);
+  const families = familiesByKey(files, titles);
 
   return files.map(file => {
-    const orig = parseServiceName(file.id);
+    const origs = parseDataset(file.id, titles);
+    const orig = origs[0];
     if (!orig) return {file, status: available.has(file.id) ? "ok" : "missing", candidates: []};
+    const origFamilies = new Set(origs.map(o => o.familyKey));
     // Prefer the detail level of the slot (eg. buc) over the one currently used (eg. bsc)
     const details = [...new Set([file.detail, orig.detail, ...(file.detail === "buc" ? ["bsc"] : [])])].filter(d => d);
     const sameRelease = parsed.filter(p =>
@@ -47,12 +70,12 @@ export function checkManifest(files, catalogue) {
 
     if (available.has(file.id)) {
       // Flag a newer version of the same dataset, eg. _V2 -> _V3
-      const newer = sameRelease
-        .filter(p => p.familyKey === orig.familyKey && p.detail === orig.detail && p.version > orig.version)
-        .sort(byVersion);
+      const newer = uniqueNames(sameRelease
+        .filter(p => origFamilies.has(p.familyKey) && p.detail === orig.detail && p.version > orig.version)
+        .sort(byVersion));
       return {file, status: newer.length ? "outdated" : "ok", candidates: newer.map(p => p.name)};
     }
-    const candidates = details.flatMap(d => sameRelease.filter(p => p.detail === d).sort(byVersion));
+    const candidates = uniqueNames(details.flatMap(d => sameRelease.filter(p => p.detail === d).sort(byVersion)));
     return {file, status: "missing", candidates: candidates.map(p => p.name)};
   });
 }
@@ -117,9 +140,9 @@ export function datasetsBySize(ids) {
 //   - "new": the latest release for each year after the latest year in the manifest
 // All detail levels come from the same release; any it doesn't have are listed in missing.
 // Returns [{key, code, year, month, status, ids: {detail: name}, missing: [detail]}].
-export function findNewReleases(files, catalogue) {
-  const parsed = catalogue.map(parseServiceName).filter(p => p && p.detail && !p.variant);
-  const families = familiesByKey(files);
+export function findNewReleases(files, catalogue, titles) {
+  const parsed = parseCatalogue(catalogue, titles);
+  const families = familiesByKey(files, titles);
   const releases = [];
 
   for (const key of Object.keys(families)) {
@@ -140,7 +163,7 @@ export function findNewReleases(files, catalogue) {
       let status, details;
       if (years.includes(year)) {
         const yearFiles = keyFiles.filter(f => f.year === year);
-        const current = Math.max(...yearFiles.map(f => parseServiceName(f.id)).filter(p => p).map(releaseOrder));
+        const current = Math.max(...yearFiles.map(f => parseDataset(f.id, titles)[0]).filter(p => p).map(releaseOrder));
         if (byYear[year].order <= current) continue;
         status = "update";
         details = yearFiles.map(f => f.detail);

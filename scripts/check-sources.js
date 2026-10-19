@@ -17,8 +17,8 @@ import { parseArgs } from "util";
 import { readFileSync } from "fs";
 import source_files from "../config/source-files.js";
 import geo_config from "../config/geo-config.js";
-import { listServices, getLayerId, getLayerInfo, getFeatureCount, fetchAttributes, resolveFields, parseServiceName } from "./lib/arcgis.js";
-import { expandGeoSources, checkManifest, findNewReleases, codesInYear, compareCodes, renamedCodes, datasetsBySize, checkLookups } from "./lib/sources.js";
+import { listServices, listServiceTitles, getLayerId, getLayerInfo, getFeatureCount, fetchAttributes, resolveFields } from "./lib/arcgis.js";
+import { expandGeoSources, checkManifest, findNewReleases, codesInYear, compareCodes, renamedCodes, datasetsBySize, checkLookups, parseDataset } from "./lib/sources.js";
 import { csvParse } from "./utils.js";
 import { yy, files as paths } from "../config/paths.js";
 
@@ -31,6 +31,8 @@ const files = [
 
 console.log("Fetching the list of Geoportal datasets...");
 const catalogue = await listServices();
+// Titles are matched as well as service names, as they're more consistent
+const titles = await listServiceTitles();
 console.log(`Found ${catalogue.length.toLocaleString()} datasets.\n`);
 
 // Check that a dataset exists, has a {CODE}{YY}CD field and isn't empty
@@ -38,7 +40,7 @@ const verified = new Map();
 async function verify(id, code) {
   if (args["no-verify"]) return "";
   if (!verified.has(id)) {
-    const year = parseServiceName(id)?.year;
+    const year = parseDataset(id, titles)[0]?.year;
     verified.set(id, getLayerId(id)
       .then(async layer => {
         resolveFields((await getLayerInfo(id, layer)).fields, code, yy(year));
@@ -61,7 +63,7 @@ async function isAvailable(id) {
 }
 
 // 1. Existing manifest entries
-const results = checkManifest(files, catalogue);
+const results = checkManifest(files, catalogue, titles);
 // The catalogue listing isn't always complete, so confirm that "missing" datasets
 // really are unavailable before reporting them
 for (const result of results.filter(r => r.status === "missing")) {
@@ -107,7 +109,7 @@ for (const lookup of source_files.lookups.filter(l => l.href)) {
 }
 
 // 3. Newer releases (one per calendar year), as entries ready to paste into config/source-files.js
-const releases = findNewReleases(files, catalogue);
+const releases = findNewReleases(files, catalogue, titles);
 const monthName = (m) => m ? `${m[0].toUpperCase()}${m.slice(1)} ` : "";
 console.log(`\n== Newer releases: ${releases.length} found ==`);
 
