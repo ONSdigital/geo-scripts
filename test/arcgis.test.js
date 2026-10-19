@@ -83,3 +83,7 @@ test("queryUrl targets the given layer", () => {
   assert.match(queryUrl("Wards_December_2024_Boundaries_UK_BSC", {layer: 10}), /\/FeatureServer\/10\/query\?/);
   assert.match(queryUrl("WD_MAY_2026_UK_BGC"), /\/FeatureServer\/0\/query\?/);
 });
+
+test("pickLayer also uses a service's only table (eg. lookups)", () => {
+  assert.equal(pickLayer({layers: [], tables: [{id: 0, name: "OA_LSOA_MSOA_EW_DEC_2021_LU_v3"}]}, "X"), 0);
+});

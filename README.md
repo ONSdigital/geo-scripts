@@ -52,7 +52,7 @@ npm run all-scripts -- --geo wd
 | Script | Options |
 | ------ | ------- |
 | download-files | `--geo`, `--year`, `--force` (download again), `--source geoportal` (skip the archive) |
-| archive-sources | `--geo`, `--year`, `--other` (include census/other files), `--dry-run` |
+| archive-sources | `--geo`, `--year`, `--lookups` (include the lookups), `--dry-run` |
 | make-lists | `--geo`, `--year` |
 | get-best-fits, make-geos, make-cm-geos | `--geo` only, because their outputs combine every year of a geography. `make-geos --clean` deletes the selected types' files first. |
 | make-vtiles | `--geo`, `--year` (tileset keys from `vtiles-config.js`), `--force` (remake) |
@@ -80,7 +80,7 @@ The tests (in `/test`) cover the shared functions in `/scripts/lib` and the cons
 
 ### download-files
 
-This script will download and transform boundary and lookup files from the ONS Open Geography Portal, as well as MSOA Names from the House of Commons Library. The config can be found at `/config/source-files.js`.
+This script will download and transform boundary and lookup files from the ONS Open Geography Portal, as well as MSOA Names from the House of Commons Library. Lookups (the census lookup, the National Statistics Postcode Lookup and the MSOA names) are saved to `/input/sources`, and only their current version is kept: `npm run check-sources` reports new NSPL editions, and the MSOA names are checked for changes on every run. The config can be found at `/config/source-files.js`.
 
 Files are downloaded from the [source file archive](docs/Source-file-archive.md) (GitHub releases in [ONSdigital/geo-source-files](https://github.com/ONSdigital/geo-source-files/releases)) when it has them, so that everyone uses the same files even after the Geoportal retires a dataset; other files come from the Geoportal. Add `--source geoportal` to skip the archive. New or corrected files are added to the archive with `npm run archive-sources` (see the [archive docs](docs/Source-file-archive.md)).
 
@@ -146,7 +146,7 @@ These ZIP files can be unzipped and uploaded to a static file service such as AW
 
 ### make-postcodes
 
-This script takes the [National Statistic Postcode Lookup](https://www.ons.gov.uk/methodology/geography/geographicalproducts/postcodeproducts) as an input and generates a series of [postcode lookup files](docs/Postcode-lookup-files.md) with filenames in the form **/P.json**, **/PO.json**, **/PO1.json**, **/PO14.json**. The files contain postcodes with those prefixes and their longitude/latitude centroid coordinates.
+This script takes the [National Statistic Postcode Lookup](https://www.ons.gov.uk/methodology/geography/geographicalproducts/postcodeproducts) as an input and generates a series of [postcode lookup files](docs/Postcode-lookup-files.md) with filenames in the form **/P.json**, **/PO.json**, **/PO1.json**, **/PO14.json**. The files contain postcodes with those prefixes and their longitude/latitude centroid coordinates. It reads the NSPL from `/input/sources/nspl.csv.gz`, which `download-files` keeps up to date with the current edition.
 
 ### make-search-tiles
 

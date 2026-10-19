@@ -18,7 +18,7 @@ import { readFileSync } from "fs";
 import source_files from "../config/source-files.js";
 import geo_config from "../config/geo-config.js";
 import { listServices, getLayerId, getLayerInfo, getFeatureCount, fetchAttributes, resolveFields, parseServiceName } from "./lib/arcgis.js";
-import { expandGeoSources, checkManifest, findNewReleases, codesInYear, compareCodes, renamedCodes, datasetsBySize } from "./lib/sources.js";
+import { expandGeoSources, checkManifest, findNewReleases, codesInYear, compareCodes, renamedCodes, datasetsBySize, checkLookups } from "./lib/sources.js";
 import { csvParse } from "./utils.js";
 import { yy, files as paths } from "../config/paths.js";
 
@@ -81,7 +81,32 @@ for (const {file, status, candidates} of problems) {
   }
 }
 
-// 2. Newer releases (one per calendar year), as entries ready to paste into config/source-files.js
+// 2. Lookups (only the current version of each is kept, eg. the latest NSPL edition)
+async function verifyLookup(id, lookup) {
+  try {
+    const layer = await getLayerId(id);
+    const names = (await getLayerInfo(id, layer)).fields.map(f => f.name);
+    const missing = [...Object.keys(lookup.columns || {}), ...(lookup.required || [])].filter(c => !names.includes(c));
+    if (missing.length) return `NOT USABLE: missing columns ${missing.join(", ")}`;
+    const count = await getFeatureCount(id, layer);
+    return count > 0 ? `OK, ${count.toLocaleString()} rows` : "NOT USABLE: no rows";
+  } catch (err) {
+    return `NOT USABLE: ${err.message.split(". ")[0]}`;
+  }
+}
+console.log("\n== Lookups ==");
+for (const {lookup, listed, newer} of checkLookups(source_files.lookups, catalogue)) {
+  const available = listed || await isAvailable(lookup.id);
+  console.log(`\n${lookup.name}: ${lookup.id}`);
+  console.log(available ? "  current" : "  MISSING from the Geoportal (retired, renamed or made private)");
+  if (newer) console.log(`  newer edition/version: ${newer}  [${await verifyLookup(newer, lookup)}]\n  To use it, change this lookup's id in config/source-files.js and run download-files with --force.`);
+  else if (available) console.log("  no newer edition or version found");
+}
+for (const lookup of source_files.lookups.filter(l => l.href)) {
+  console.log(`\n${lookup.name}: ${lookup.href}\n  always the latest version (download-files checks it for changes on every run)`);
+}
+
+// 3. Newer releases (one per calendar year), as entries ready to paste into config/source-files.js
 const releases = findNewReleases(files, catalogue);
 const monthName = (m) => m ? `${m[0].toUpperCase()}${m.slice(1)} ` : "";
 console.log(`\n== Newer releases: ${releases.length} found ==`);

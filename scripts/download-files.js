@@ -1,7 +1,6 @@
 import { writeFileSync, appendFileSync, existsSync, renameSync, rmSync, openSync, readSync, closeSync } from "fs";
-import { csvFormat } from "d3-dsv";
-import { run, csvParse, mkdir } from "./utils.js";
-import { fetchText, fetchJSON, downloadToFile } from "./lib/http.js";
+import { run, mkdir } from "./utils.js";
+import { fetchJSON, downloadToFile } from "./lib/http.js";
 import { getLayerId, getLayerInfo, getFeatureCount, queryUrl, resolveFields, checkResponse, ArcGISError } from "./lib/arcgis.js";
 import source_files from "../config/source-files.js";
 import { dirs, yy } from "../config/paths.js";
@@ -11,10 +10,11 @@ import geo_config from "../config/geo-config.js";
 import { tagFor, assetUrl, getManifest, sha256File } from "./lib/archive.js";
 import { readRecord, recordDownload, recordedOtherSource } from "./lib/local-sources.js";
 import { cleanFeature, writeCleanFeatures } from "./lib/features.js";
+import { writeLookup } from "./lib/lookups.js";
 
 const usage = `Usage: npm run download-files -- [--geo ltla,wd] [--year 2025] [--force] [--source geoportal]
   --geo, --year  only download boundaries/centroids for these geographies and years
-                 (other source files are only downloaded when there is no selection)
+                 (lookups are only downloaded when there is no selection)
   --force        download again even if the file already exists
   --source       "archive" (default): use the copy in the source file archive if there is one,
                  otherwise the Geoportal. "geoportal": always use the Geoportal.`;
@@ -28,8 +28,7 @@ const isSelected = (file) => selected.some(g => g.key === file.key && g.years.in
 const sources = {
   boundaries: expandGeoSources(source_files.boundaries).filter(isSelected),
   centroids: expandGeoSources(source_files.centroids).filter(isSelected),
-  census: isSelection(opts) ? [] : source_files.census,
-  other: isSelection(opts) ? [] : source_files.other
+  sources: isSelection(opts) ? [] : source_files.lookups
 };
 
 // Page through a FeatureServer layer, writing features as GeoJSONSeq with
@@ -74,36 +73,71 @@ const downloadGeo = async (file, path) => {
   return received;
 }
 
-const makeUrl = (id, ref_id) => {
-  return id.slice(-2) === "_0" ?
-    `https://opendata.arcgis.com/api/v3/datasets/${id}/downloads/data?format=csv&spatialRefId=${ref_id ? ref_id : 4326}&where=1%3D1` :
-    `https://www.arcgis.com/sharing/rest/content/items/${id}/data`;
+// The two Geoportal services that serve whole datasets as single pre-built files. Some
+// datasets are only available from one of them.
+const bulkUrls = (item, layer, format) => [
+  `https://opendata.arcgis.com/api/v3/datasets/${item}_${layer}/downloads/data?format=${format}&spatialRefId=4326&where=1%3D1`,
+  `https://hub.arcgis.com/api/download/v1/items/${item}/${format}?redirect=true&layers=${layer}&spatialRefId=4326`
+];
+
+// Download a Geoportal table (eg. the NSPL) as one CSV, check its row count against the
+// API, and save it (gzipped if the name ends in .gz), keeping only file.columns if set
+async function downloadLookup(file, path) {
+  const layer = await getLayerId(file.id);
+  const info = await getLayerInfo(file.id, layer);
+  const expected = await getFeatureCount(file.id, layer);
+  if (!info.serviceItemId) throw new Error(`No downloadable file for ${file.id}`);
+  const temp = {csv: `${path}.download.csv`, out: `${path}.part`};
+  console.log(`Downloading ${expected.toLocaleString()} rows from ${file.id} as a single file`);
+  try {
+    const urls = bulkUrls(info.serviceItemId, layer, "csv");
+    for (const [i, url] of urls.entries()) {
+      try {
+        await downloadToFile(url, temp.csv, {retries: 1});
+        if (!looksLikeCsv(temp.csv)) throw new Error("the download wasn't a CSV file");
+        break;
+      } catch (err) {
+        if (i === urls.length - 1) throw err;
+      }
+    }
+    const rows = await writeLookup(temp.csv, temp.out, {columns: file.columns, required: file.required, gzipped: path.endsWith(".gz")});
+    if (rows !== expected) throw new Error(`expected ${expected.toLocaleString()} rows but the file has ${rows.toLocaleString()}`);
+    renameSync(temp.out, path);
+  } finally {
+    for (const p of Object.values(temp)) rmSync(p, {force: true});
+  }
 }
 
-const downloadLookup = async (file, path) => {
-  const href = makeUrl(file.id, file.ref_id);
-  const data_raw = await fetchText(href);
-  const names = file.names ? file.names : ["areacd", "parentcd"];
-  const data = csvParse(data_raw, (d) => {
-    const row = {};
-    for (let i = 0; i < file.fields.length; i ++) {
-      row[names[i]] = d[file.fields[i]];
-    }
-    return row;
-  });
-  const missing = file.fields.filter(f => !data.columns.includes(f));
-  if (data.length === 0 || missing.length > 0) {
-    throw new Error(`Lookup ${file.id} is empty or missing fields: ${missing.join(", ")}`);
+// Download a file from a URL that always gives the latest version (eg. the MSOA names).
+// It's fetched on every run, and replaces the local copy only if it has changed.
+async function downloadLatest(file, path) {
+  const tmp = `${path}.latest`;
+  await downloadToFile(file.href, tmp);
+  if (existsSync(path) && await sha256File(path) === await sha256File(tmp)) {
+    rmSync(tmp, {force: true});
+    console.log(`${path} is up to date`);
+    return false;
   }
-  const part = `${path}.part`;
-  writeFileSync(part, csvFormat(data, names));
-  renameSync(part, path);
-};
+  const updated = existsSync(path);
+  renameSync(tmp, path);
+  console.log(updated ? `Updated ${path} (the latest version has changed)` : `Downloaded ${path}`);
+  return true;
+}
 
-// Convert raw GeoJSONSeq to rounded, gzipped GeoJSONSeq at out_path
+// Whether a file starts like a CSV (not empty, HTML or JSON)
+function looksLikeCsv(path) {
+  const fd = openSync(path, "r");
+  const buffer = Buffer.alloc(64);
+  const read = readSync(fd, buffer, 0, 64, 0);
+  closeSync(fd);
+  const start = buffer.subarray(0, read).toString().replace(/^\uFEFF/, "").trimStart();
+  return start.length > 0 && !/^[<{[]/.test(start);
+}
+
 // Coordinate precision for a file's detail level
 const precisionFor = (path) => path.includes("_bf") || path.includes("_pwc") ? 6 : path.includes("_bu") ? 4 : 5;
 
+// Convert raw GeoJSONSeq to rounded, gzipped GeoJSONSeq at out_path
 const convertGeo = async (raw_path, out_path) => {
   const tmp_path = out_path.replace(".json.gz", ".convert.json");
   const precision = precisionFor(out_path);
@@ -174,10 +208,7 @@ async function downloadGeoBulk(file, out_path) {
   const item = info.serviceItemId;
   if (!item) return false;
 
-  const urls = [
-    `https://opendata.arcgis.com/api/v3/datasets/${item}_${layer}/downloads/data?format=geojson&spatialRefId=4326&where=1%3D1`,
-    `https://hub.arcgis.com/api/download/v1/items/${item}/geojson?redirect=true&layers=${layer}&spatialRefId=4326`
-  ];
+  const urls = bulkUrls(item, layer, "geojson");
   const base = out_path.replace(".json.gz", "");
   const temp = {hub: `${base}.hub.geojson`, lines: `${base}.lines.geojson`, raw: `${base}.download.jsonl`};
   console.log(`Downloading ${expected.toLocaleString()} features from ${file.id} as a single file`);
@@ -212,6 +243,17 @@ async function downloadGeoBulk(file, out_path) {
 async function downloadFile(key, file, dir) {
   const name = ["boundaries", "centroids"].includes(key) ? `${file.name}.json.gz` : file.name;
   const source = file.id || file.href;
+  // Files at a "latest" URL are checked on every run, using the archive only if that fails
+  if (file.href) {
+    try {
+      if (await downloadLatest(file, `${dir}/${name}`)) recordDownload(name, source, "source");
+      return;
+    } catch (err) {
+      console.log(`Couldn't download ${file.href} (${err.message}), so trying the archive`);
+      if (await downloadFromArchive(file, name, `${dir}/${name}`, source, false)) return;
+      throw err;
+    }
+  }
   // Download again if the local copy is from a different dataset than the config now uses
   const previous = recordedOtherSource(readRecord(), name, source);
   if (previous && existsSync(`${dir}/${name}`)) console.log(`${dir}/${name} is from ${previous}, but the config now uses ${source}, so downloading it again`);
@@ -230,9 +272,8 @@ async function downloadFile(key, file, dir) {
   } else {
     const path = `${dir}/${name}`;
     if (existsSync(path) && !force) return console.log(`${path} already downloaded`);
-    if (key === "census") await downloadLookup(file, path);
-    else await downloadToFile(file.href, path);
-    recordDownload(name, source, "source");
+    await downloadLookup(file, path);
+    recordDownload(name, source, "geoportal");
     console.log(`Downloaded ${path}`);
   }
 }

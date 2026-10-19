@@ -174,12 +174,20 @@ export default {
       pwc: "MSOA_December_2021_EW_PWC_V2",
     }},
   ],
-  census: [
-    // This is a frozen Census 2021 lookup for interfacing with the Nomis API
-    {name: "oa21_lsoa21_msoa21_ltla22.csv", id: "b9ca90c10aaa4b8d9791e9859a38ca67_0", fields: ["OA21CD", "LSOA21CD", "MSOA21CD", "LAD22CD"], names: ["oa21cd", "lsoa21cd", "msoa21cd", "ltla22cd"]},
-  ],
-  other: [
-    {name: "msoa_names.csv", href: "https://houseofcommonslibrary.github.io/msoanames/MSOA-Names-Latest2.csv"},
-    {name: "nspl.zip", href: "https://www.arcgis.com/sharing/rest/content/items/077631e063eb4e1ab43575d01381ec33/data"},
+  // Lookups, saved to ./input/sources/. Unlike boundaries, only the current version of each
+  // is kept: eg. each new NSPL edition (published quarterly) replaces the last one.
+  //   id: a Geoportal table, downloaded as CSV (check-sources flags newer editions/versions)
+  //   href: a URL that always gives the latest version (checked for changes on every run)
+  //   columns: keep only these columns, renamed (otherwise all columns are kept)
+  //   required: columns the scripts need, checked when downloading
+  lookups: [
+    // Frozen Census 2021 OA -> LSOA -> MSOA -> LAD lookup, for interfacing with the Nomis API
+    {key: "census", name: "oa21_lsoa21_msoa21_ltla22.csv", id: "OA_LSOA_MSOA_EW_DEC_2021_LU_v3",
+      columns: {OA21CD: "oa21cd", LSOA21CD: "lsoa21cd", MSOA21CD: "msoa21cd", LAD22CD: "ltla22cd"}},
+    // National Statistics Postcode Lookup, all columns, gzipped
+    {key: "nspl", name: "nspl.csv.gz", id: "National_Statistics_Postcode_Lookup_(August_2026)_for_the_United_Kingdom_(Hosted_Table)",
+      required: ["pcds", "lat", "long"]},
+    // House of Commons Library MSOA names
+    {key: "msoa_names", name: "msoa_names.csv", href: "https://houseofcommonslibrary.github.io/msoanames/MSOA-Names-Latest2.csv"},
   ],
 };

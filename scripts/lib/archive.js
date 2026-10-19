@@ -7,7 +7,7 @@ import archive from "../../config/archive.js";
 export const MANIFEST = "manifest.json";
 
 // The release a source file belongs to, eg. {key: "wd", year: 2025} -> "wd-2025"
-export const tagFor = (file) => file.key && file.year ? `${file.key}-${file.year}` : archive.otherTag;
+export const tagFor = (file) => file.key && file.year ? `${file.key}-${file.year}` : archive.lookupsTag;
 
 export const assetUrl = (tag, name, repo = archive.repo) =>
   `https://github.com/${repo}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`;

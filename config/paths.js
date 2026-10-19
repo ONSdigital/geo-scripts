@@ -9,8 +9,8 @@ export const dirs = {
   // Downloaded source data (see config/source-files.js)
   boundaries: "./input/boundaries",
   centroids: "./input/centroids",
-  census: "./input/census",
-  other: "./input/other",
+  // Lookups downloaded as they are (census lookup, NSPL, MSOA names)
+  sources: "./input/sources",
   // Lookups derived from the source data
   lookups: "./input/lookups",
   // Scratch space for intermediate files (emptied by some scripts)
@@ -28,9 +28,9 @@ export const files = {
   // Boundary file for a geography, year and detail level, eg. ./input/boundaries/ltla25_bgc.json.gz
   boundary: (key, year, detail) => `${dirs.boundaries}/${key}${yy(year)}_${detail}.json.gz`,
   centroids: (key, year) => `${dirs.centroids}/${key}${yy(year)}_pwc.json.gz`,
-  censusLookup: `${dirs.census}/oa21_lsoa21_msoa21_ltla22.csv`,
-  msoaNames: `${dirs.other}/msoa_names.csv`,
-  nspl: `${dirs.other}/nspl.zip`,
+  censusLookup: `${dirs.sources}/oa21_lsoa21_msoa21_ltla22.csv`,
+  msoaNames: `${dirs.sources}/msoa_names.csv`,
+  nspl: `${dirs.sources}/nspl.csv.gz`,
   // Which dataset each downloaded source file came from (written by download-files)
   sourceRecord: "./input/sources.json",
   // Written by get-metadata

@@ -110,3 +110,23 @@ test("renamedCodes finds areas whose name changed but code didn't", () => {
   const after = new Map([["E07000083", "North Gloucestershire"], ["E07000084", "Basingstoke and Deane "], ["E07000999", "New"], ["E05000001", "Renamed ward"]]);
   assert.deepEqual(renamedCodes(before, after, ["E07"]), ["E07000083"]);
 });
+
+test("checkLookups finds newer editions and versions of lookups", async () => {
+  const { checkLookups } = await import("../scripts/lib/sources.js");
+  const lookups = [
+    {key: "census", id: "OA_LSOA_MSOA_EW_DEC_2021_LU_v3"},
+    {key: "nspl", id: "National_Statistics_Postcode_Lookup_(May_2026)_for_the_United_Kingdom"},
+    {key: "msoa_names", href: "https://example.test/latest.csv"}
+  ];
+  const catalogue = [
+    "OA_LSOA_MSOA_EW_DEC_2021_LU_v3",
+    "OA_LSOA_MSOA_EW_DEC_2021_LU_v4",
+    "National_Statistics_Postcode_Lookup_(February_2026)_for_the_UK_(Hosted_Table)",
+    "National_Statistics_Postcode_Lookup_(August_2026)_for_the_United_Kingdom_(Hosted_Table)",
+    "NSPL_Online_latest_Centroids"
+  ];
+  assert.deepEqual(checkLookups(lookups, catalogue).map(r => [r.lookup.key, r.listed, r.newer]), [
+    ["census", true, "OA_LSOA_MSOA_EW_DEC_2021_LU_v4"],
+    ["nspl", false, "National_Statistics_Postcode_Lookup_(August_2026)_for_the_United_Kingdom_(Hosted_Table)"]
+  ]);
+});

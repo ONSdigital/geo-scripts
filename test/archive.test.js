@@ -12,7 +12,7 @@ afterEach(() => {
 
 test("tagFor names a release per geography and year", () => {
   assert.equal(tagFor({key: "wd", year: 2025, name: "wd25_bfc"}), "wd-2025");
-  assert.equal(tagFor({name: "nspl.zip", href: "https://example.test"}), "other");
+  assert.equal(tagFor({key: "nspl", name: "nspl.csv.gz"}), "lookups");
 });
 
 test("assetUrl points at a release download", () => {

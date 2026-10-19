@@ -88,6 +88,23 @@ export function renamedCodes(before, after, prefixes) {
     .sort();
 }
 
+// For lookups (eg. the NSPL), whether each dataset is still listed, and the newest
+// edition or version in the catalogue if there's a newer one: a later month/year (eg.
+// NSPL February -> May) or a higher version of the same release (eg. _v3 -> _v4).
+// Returns [{lookup, listed, newer}].
+export function checkLookups(lookups, catalogue) {
+  const available = new Set(catalogue);
+  const parsed = catalogue.map(parseServiceName).filter(p => p);
+  const rank = (p) => releaseOrder(p) * 1000 + p.version;
+  return lookups.filter(l => l.id).map(lookup => {
+    const current = parseServiceName(lookup.id);
+    const newer = current ? parsed
+      .filter(p => p.familyKey === current.familyKey && !p.variant && rank(p) > rank(current))
+      .sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name))[0]?.name || null : null;
+    return {lookup, listed: available.has(lookup.id), newer};
+  });
+}
+
 // A release's datasets, quickest to query first (they all have the same attributes)
 export function datasetsBySize(ids) {
   return ["buc", "bsc", "bgc", "bfc", "bfe", "pwc"].filter(d => ids[d]).map(d => ids[d]);

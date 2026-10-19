@@ -3,6 +3,7 @@ node_modules/
 /input/lookups/*
 /input/oas/*
 /input/other/*
+/input/sources/*
 /input/parents/*
 /input/centroids/*
 /input/postcodes/*

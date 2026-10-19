@@ -16,12 +16,13 @@ import { withRetry } from "./lib/http.js";
 import { readRecord, recordedOtherSource } from "./lib/local-sources.js";
 import { MANIFEST, tagFor, getManifest, sha256File, updateManifest } from "./lib/archive.js";
 
-const usage = `Usage: npm run archive-sources -- [--geo wd] [--year 2025] [--other] [--dry-run]
+const usage = `Usage: npm run archive-sources -- [--geo wd] [--year 2025] [--lookups] [--dry-run]
   --geo, --year  only archive boundaries/centroids for these geographies and years
-  --other        also archive the census and other source files (included when there's no selection)
+  --lookups      also archive the lookups (census lookup, NSPL, MSOA names), which are
+                 included when there's no selection. Changed files replace the archived ones.
   --dry-run      show what would be uploaded without uploading anything`;
 const {opts, selected} = cli(usage, opts => selectGeos(geo_config, opts), {
-  other: {type: "boolean", default: false},
+  lookups: {type: "boolean", default: false},
   "dry-run": {type: "boolean", default: false}
 });
 const dryRun = opts["dry-run"];
@@ -31,10 +32,7 @@ const isSelected = (file) => selected.some(g => g.key === file.key && g.years.in
 const files = [
   ...expandGeoSources(source_files.boundaries).filter(isSelected).map(f => ({...f, name: `${f.name}.json.gz`, path: `${dirs.boundaries}/${f.name}.json.gz`})),
   ...expandGeoSources(source_files.centroids).filter(isSelected).map(f => ({...f, name: `${f.name}.json.gz`, path: `${dirs.centroids}/${f.name}.json.gz`})),
-  ...(!isSelection(opts) || opts.other ? [
-    ...source_files.census.map(f => ({...f, path: `${dirs.census}/${f.name}`})),
-    ...source_files.other.map(f => ({...f, path: `${dirs.other}/${f.name}`}))
-  ] : [])
+  ...(!isSelection(opts) || opts.lookups ? source_files.lookups.map(f => ({...f, path: `${dirs.sources}/${f.name}`})) : [])
 ];
 
 const byTag = new Map();

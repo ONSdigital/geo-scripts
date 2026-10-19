@@ -35,9 +35,10 @@ export function checkResponse(json, id) {
 }
 
 // Pick the layer to use from a FeatureServer's service info. Geoportal datasets have a
-// single layer, which is usually (but not always) layer 0, eg. some use layer 1 or 10.
+// single layer (or, for lookups, a single table), which is usually but not always id 0,
+// eg. some use layer 1 or 10.
 export function pickLayer(service, id) {
-  const layers = service.layers || [];
+  const layers = [...(service.layers || []), ...(service.tables || [])];
   if (layers.length !== 1) {
     const found = layers.map(l => `${l.id} (${l.name})`).join(", ");
     const err = new ArcGISError(`Expected one layer in "${id}" but found ${layers.length}${found ? `: ${found}` : ""}`, null, id);

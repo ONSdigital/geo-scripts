@@ -9,7 +9,7 @@ Release assets can be up to 2 GB each, so the 100 MB limit on files committed to
 ## How it's organised
 
 - **One release per geography and year,** tagged `{key}-{year}` (eg. `wd-2025`). It holds that year's files exactly as `download-files` saves them (eg. `wd25_bfc.json.gz`, gzipped GeoJSONSeq).
-- **The `other` release** holds the census lookup, the MSOA names and the NSPL.
+- **The `lookups` release** holds the census lookup, the NSPL (the full CSV, gzipped) and the MSOA names. Only the current version of each is kept: a new NSPL edition, or an updated version of the MSOA names, replaces the archived one.
 - **Each release has a `manifest.json`,** listing every file's SHA-256 checksum, size, source dataset and the date it was archived.
 
 There is one version of each file. When a file is corrected or replaced, the archived copy is overwritten under the same tag; superseded versions aren't kept.
@@ -37,7 +37,7 @@ npm run archive-sources -- --geo wd --year 2026
 
 Only files that are new or have changed are uploaded. Each release's `manifest.json` is uploaded last, so it only ever lists files that are in place. (`archive-sources` reads the existing manifests through the GitHub API, because the public download links can take a few minutes to show newly uploaded files. Until then, `download-files` may still use the Geoportal for those files.)
 
-Without `--geo`/`--year`, every downloaded source file is archived, including the census and other files (add `--other` to include those with a selection).
+Without `--geo`/`--year`, every downloaded source file is archived, including the lookups (add `--lookups` to include those with a selection).
 
 ### Adding a new year
 
