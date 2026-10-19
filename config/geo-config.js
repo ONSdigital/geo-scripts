@@ -33,7 +33,7 @@ const geographies = [
     key: "ctry",
 		codes: ["E92", "N92", "S92", "W92"],
 		parents: ["K02"],
-    label: "country",
+    label: "Country",
     detail: "buc",
     list: ["ap", "cp"]
   },
@@ -68,21 +68,21 @@ const geographies = [
     key: "rgn",
 		codes: ["E12"],
 		parents: ["E92"],
-    label: "region",
+    label: "Region",
     list: ["ap", "cp"]
   },
   {
     key: "cauth",
 		codes: ["E47"],
 		parents: ["E12"],
-    label: "combined authority",
+    label: "Combined authority",
     list: ["ap", "cp"]
   },
   {
     key: "cty",
 		codes: ["E10"],
 		parents: ["E47", "E12"],
-    label: "county",
+    label: "County",
     list: ["ap", "cp"]
   },
   {
@@ -91,21 +91,21 @@ const geographies = [
     cmfilter: ["E", "W"],
 		codes: ["E06", "E07", "E08", "E09", "N09", "S12", "W06"],
 		parents: ["E10", "E47", "E12", "N92", "S92", "W92"],
-    label: "local authority district",
+    label: "Lower tier/unitary authority",
     list: ["ap", "cp"]
   },
   {
     key: "wpc",
 		codes: ["E14", "N05", "N06", "S14", "W07"],
 		parents: ["E12", "N92", "S92", "W92"],
-    label: "parliamentary constituency",
+    label: "Parliamentary constituency",
     list: ["ap", "cp"]
   },
   {
     key: "wd",
 		codes: ["E05", "W05"],
 		parents: ["E06", "E07", "E08", "E09", "W06"],
-    label: "electoral ward",
+    label: "Electoral ward",
     list: ["ap", "cp"],
     listparents: true
   },
@@ -113,7 +113,7 @@ const geographies = [
     key: "par",
 		codes: ["E04", "W04"],
 		parents: ["E06", "E07", "E08", "E09", "W06"],
-    label: "civil parish",
+    label: "Parish",
     list: ["ap", "cp"],
     listparents: true
   },
@@ -139,14 +139,14 @@ const geographies = [
     key: "ttwa",
 		codes: ["E30", "K01", "W22"],
 		parents: ["E12", "W92"],
-    label: "travel to work area",
+    label: "Travel to work area",
     list: ["cp"]
   },
   {
     key: "bua",
 		codes: ["E63", "K08", "W45"],
 		parents: ["E06", "E07", "E08", "E09", "W06"],
-    label: "built up area",
+    label: "Built-up area",
     detail: "bfc",
     list: ["cp"]
   },
@@ -155,13 +155,13 @@ const geographies = [
 		codes: ["E02", "W02"],
 		parents: ["E06", "E07", "E08", "E09", "W06"],
     cmkey: "MSOA",
-    label: "middle layer super output area",
+    label: "Middle-layer super output area",
   },
   {
     key: "lsoa",
 		codes: ["E01", "W01"],
 		parents: ["E02", "W02"],
-    label: "lower layer super output area",
+    label: "Lower-layer super output area",
     detail: "bfc"
   },
   {
@@ -169,7 +169,7 @@ const geographies = [
 		codes: ["E00", "W00"],
 		parents: ["E01", "W01"],
     cmkey: "OA",
-    label: "output area",
+    label: "Output area",
     detail: "bfc"
   },
 ];

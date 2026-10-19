@@ -6,6 +6,7 @@ import geos from "../config/geo-config.js";
 import types from "../config/geo-types.js";
 import { dirs, files } from "../config/paths.js";
 import { cli, selectGeos } from "./lib/cli.js";
+import { groupChildren } from "./lib/children.js";
 
 const usage = `Usage: npm run make-geos -- [--geo ltla,wd] [--clean]
   --geo    only generate files for these geographies (from config/geo-config.js)
@@ -90,6 +91,10 @@ function makeGeo(geo, year, indexes, lookup, census_lookup) {
         written.add(areacd);
         // Make simple props
         const lkp = lookup[areacd];
+        if (!lkp) {
+          console.error(`${areacd} (in ${geo_path}) isn't in ${files.lookup}. The lookup is out of date: run get-metadata and get-relations (or npm run process-sources) first.`);
+          process.exit(1);
+        }
         const props = propsToNames(
           lkp,
           ["bounds", "centroid", "areakm2", "start", "end"]
@@ -114,12 +119,12 @@ function makeGeo(geo, year, indexes, lookup, census_lookup) {
         // Add parents and children. Virtual geographies outside the hierarchy (eg. Great
         // Britain) take them from their config: their member countries, and the UK.
         const outside = geo.virtual?.parent;
-        props.children = outside ?
-          geo.virtual.members.map(cd => propsToNames(lookup[cd])).sort((a, b) => a.areacd.localeCompare(b.areacd)) :
+        const children = outside ?
+          geo.virtual.members.map(cd => propsToNames(lookup[cd])) :
           getChildren(lookup, indexes.by_parent, areacd);
-        props.child_typecds = props.children[0] ?
-          Array.from(new Set(props.children.map(c => c.areacd.slice(0, 3)))).sort((a, b) => a.localeCompare(b)) :
-          [];
+        // Children grouped by kind of area, eg. a region's authorities, then its constituencies
+        props.children = groupChildren(children, geos);
+        props.child_typecds = Array.from(new Set(children.map(c => c.areacd.slice(0, 3)))).sort((a, b) => a.localeCompare(b));
         props.parents = outside ?
           [propsToNames(lookup[geo.virtual.parent], ["start", "end"])] :
           getParents(lookup, areacd);

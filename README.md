@@ -134,7 +134,7 @@ This script generates [CSV lists of codes and names](docs/Area-lists.md) for pla
 
 ### make-geos
 
-This script generates the [area metadata files](docs/Area-metadata-files.md) shared by **Build a Custom Area Profile** and **Explore Local Statistics** (in the `/output/geos` folder). The config can be found at `/config/geo-config.js`.
+This script generates the [area metadata files](docs/Area-metadata-files.md) shared by **Build a Custom Area Profile** and **Explore Local Statistics** (in the `/output/geos` folder). The config can be found at `/config/geo-config.js`. Each file's child areas are grouped as in Explore Local Statistics, with the area's highest child authorities in one group (`scripts/lib/children.js`).
 
 Existing files are overwritten. To also remove files for areas that are no longer in the lookup, add `--clean` (eg. `npm run make-geos -- --geo wd --clean`).
 
