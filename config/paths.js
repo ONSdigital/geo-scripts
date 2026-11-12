@@ -21,7 +21,7 @@ export const dirs = {
   lists: "./output/lists",
   vtiles: "./output/vtiles",
   postcodes: "./output/postcodes",
-  search: (year) => `./output/search${yy(year)}`
+  search: "./output/search"
 };
 
 export const files = {

@@ -44,7 +44,7 @@ Scripts must run in dependency order. They talk to each other through files in `
 - **make-oa-vtiles-lookups** → **make-oa-vtiles**: OA tiles where small OAs are explicitly dissolved into their LSOA/MSOA parents at low zooms (uses mapshaper).
 - **zip-vtiles**: `tile-join -e` unpacks each mbtiles into `{z}/{x}/{y}.pbf` directories, which are then zipped for static hosting on S3/CDN.
 - **make-postcodes**: reads the NSPL (`input/sources/nspl.csv.gz`, gzipped CSV of every postcode) → `output/postcodes/{prefix}.json` (prefixes of 1–4 characters; 1–3 character prefixes hold the first 10 postcodes in 7-character `pcd7` order, sorted by the script because the downloaded rows aren't in postcode order).
-- **make-search-tiles**: z12 GeoJSON tiles for reverse geocoding (point-in-polygon) → `output/search{YY}/{x}/{y}.json`.
+- **make-search-tiles**: z12 GeoJSON tiles for reverse geocoding (point-in-polygon) → `output/search/{x}/{y}.json` (cleared first).
 - **check-centroids**: checks the generated `output/geos`.
 
 Many `.json` outputs are **gzipped despite the `.json` extension**. Read them with `readGzip()` from utils, or rename them to `.gz` before decompressing.

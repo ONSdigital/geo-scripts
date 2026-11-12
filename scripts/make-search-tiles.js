@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, appendFileSync, createReadStream } from "fs";
+import { readFileSync, writeFileSync, appendFileSync, createReadStream, rmSync } from "fs";
 import zlib from "zlib";
 import readline from "line-by-line";
 import geos from "../config/geo-config.js";
@@ -58,13 +58,13 @@ async function mergeSourceFiles(source, lookup) {
   await run(`gzip ${source.outpath}`);
 }
 
-function makeGeoJSONTiles(path, yr) {
+function makeGeoJSONTiles(path) {
   return new Promise((resolve) => {
     console.log(`Making GeoJSON tiles from ${path}...`);
     const lineReader = new readline(path);
 
     const splitter = createTileSplitter(({x, y, features}) => {
-      const dir = `${dirs.search(yr)}/${x}`;
+      const dir = `${dirs.search}/${x}`;
       const path = `${dir}/${y}.json`;
       mkdir(dir);
       writeGzip(path, JSON.stringify({type: "FeatureCollection", features}));
@@ -108,6 +108,8 @@ console.log("Unpacking search tiles...");
 const unpackCmd = `tippecanoe-decode ${output} > ${json_path}`;
 await run(unpackCmd);
 
-await makeGeoJSONTiles(json_path, yr);
+// The output folder isn't versioned, so clear tiles from any previous run
+rmSync(dirs.search, {recursive: true, force: true});
+await makeGeoJSONTiles(json_path);
 
 clearTemp();

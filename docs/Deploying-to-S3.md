@@ -13,7 +13,7 @@ This only works if every file gets the right headers:
 | [Area metadata files](Area-metadata-files.md) | `output/geos/` | Yes | `application/json` | `gzip` |
 | Census Maps area files | `output/cm-geos/` | Yes | `application/json` | `gzip` |
 | [Postcode lookup files](Postcode-lookup-files.md) | `output/postcodes/` | Yes | `application/json` | `gzip` |
-| [GeoJSON search tiles](GeoJSON-tiles.md) | `output/search{yy}/` | Yes | `application/json` | `gzip` |
+| [GeoJSON search tiles](GeoJSON-tiles.md) | `output/search/` | Yes | `application/json` | `gzip` |
 | [Vector tiles](Vector-tiles.md) (`.pbf`) | unzipped from `output/vtiles/*.zip` | Yes | `application/x-protobuf` | `gzip` |
 | Vector tile `metadata.json` | as above | Yes* | `application/json` | `gzip` |
 
@@ -70,7 +70,7 @@ aws s3 cp output/postcodes "$BUCKET/postcode-lookup/v2" --recursive \
 ### GeoJSON search tiles
 
 ```bash
-aws s3 cp output/search25 "$BUCKET/area-lookup/v2" --recursive \
+aws s3 cp output/search "$BUCKET/area-lookup/v2" --recursive \
   --exclude "*" --include "*.json" \
   --content-type "application/json" --content-encoding "gzip" --cache-control "$CACHE"
 ```

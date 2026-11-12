@@ -6,7 +6,7 @@ import geo_config from "../config/geo-config.js";
 import geo_types from "../config/geo-types.js";
 import source_files from "../config/source-files.js";
 import vtiles_config from "../config/vtiles-config.js";
-import { yy } from "../config/paths.js";
+import { yy, dirs } from "../config/paths.js";
 import { expandGeoSources } from "../scripts/lib/sources.js";
 
 // Boundary files available to the scripts: those downloaded, plus any committed to the
@@ -128,4 +128,8 @@ test("abolished geographies end after their last configured year", () => {
   for (const geo of geo_config.filter(g => g.lastYear)) {
     assert.ok(geo.lastYear >= Math.max(...geo.years), `${geo.key} lastYear ${geo.lastYear} is before its boundaries`);
   }
+});
+
+test("search tiles are written to an unversioned folder", () => {
+  assert.equal(dirs.search, "./output/search");
 });
