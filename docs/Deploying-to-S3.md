@@ -77,10 +77,10 @@ aws s3 cp output/search "$BUCKET/area-lookup/v2" --recursive \
 
 ### Vector tiles
 
-`npm run zip-vtiles` turns each `.mbtiles` file into a ZIP of `{z}/{x}/{y}.pbf` tiles plus a gzipped `metadata.json`. Unzip the tileset you want, then upload the tiles and the metadata separately so that each gets the right content type:
+`npm run zip-vtiles` turns each `.mbtiles` file into a ZIP of `{z}/{x}/{y}.pbf` tiles plus a gzipped `metadata.json`, at the root of the ZIP (with no enclosing folder). Unzip the tileset you want, then upload the tiles and the metadata separately so that each gets the right content type:
 
 ```bash
-unzip output/vtiles/wd25.zip -d temp/upload
+unzip output/vtiles/wd25.zip -d temp/upload/wd25
 TILES="$BUCKET/administrative/2025/wd"
 
 aws s3 cp temp/upload/wd25 "$TILES" --recursive \

@@ -1,4 +1,5 @@
 import { readdirSync, existsSync } from "fs";
+import { resolve } from "path";
 import { run, gzipInPlace } from "./utils.js";
 import { dirs } from "../config/paths.js";
 
@@ -14,7 +15,9 @@ for (const file of files.filter(f => f.split(".")[1] === "mbtiles")) {
     // so every file in the tileset can be served with Content-Encoding: gzip.
     const metadata = `${path}/metadata.json`;
     if (existsSync(metadata) && gzipInPlace(metadata)) console.log(`Gzipped ${metadata}`);
-    await run(`zip -r ${path}.zip -m ${path}/*`);
+    // Zip from inside the folder, so the ZIP holds {z}/{x}/{y}.pbf and metadata.json
+    // at its root, without the folder or its parents
+    await run(`zip -r -m ${resolve(`${path}.zip`)} *`, {cwd: path});
     await run(`rmdir ${path}`);
     console.log(`Zipped ${path}.zip`);
   } else {
