@@ -1,6 +1,6 @@
-import { test } from "node:test";
+import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { parseServiceName, resolveFields, checkResponse, queryUrl, pickLayer, ArcGISError } from "../scripts/lib/arcgis.js";
+import { parseServiceName, resolveFields, checkResponse, queryUrl, pickLayer, fetchArcGIS, ArcGISError } from "../scripts/lib/arcgis.js";
 
 test("parseServiceName handles the Geoportal's naming conventions", () => {
   const cases = {
@@ -86,4 +86,26 @@ test("queryUrl targets the given layer", () => {
 
 test("pickLayer also uses a service's only table (eg. lookups)", () => {
   assert.equal(pickLayer({layers: [], tables: [{id: 0, name: "OA_LSOA_MSOA_EW_DEC_2021_LU_v3"}]}, "X"), 0);
+});
+
+const realFetch = globalThis.fetch;
+afterEach(() => {
+  globalThis.fetch = realFetch;
+});
+const mockFetch = (bodies) => {
+  let calls = 0;
+  globalThis.fetch = async () => new Response(JSON.stringify(bodies[Math.min(calls ++, bodies.length - 1)]));
+  return () => calls;
+};
+
+test("fetchArcGIS retries errors returned with HTTP 200", async () => {
+  const calls = mockFetch([{error: {code: 500, message: "Error performing query operation"}}, {count: 42}]);
+  assert.deepEqual(await fetchArcGIS("https://example.com/query", "X", {backoff: 1}), {count: 42});
+  assert.equal(calls(), 2);
+});
+
+test("fetchArcGIS doesn't retry unavailable datasets", async () => {
+  const calls = mockFetch([{error: {code: 499, message: "Token Required"}}]);
+  await assert.rejects(fetchArcGIS("https://example.com/query", "X", {backoff: 1}), (err) => err.unavailable);
+  assert.equal(calls(), 1);
 });

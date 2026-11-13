@@ -13,40 +13,76 @@ export async function writeLookup(input, output, {columns, required = [], addCol
   const out = createWriteStream(output);
   const sink = gzipped ? zlib.createGzip() : out;
   if (gzipped) sink.pipe(out);
-  const write = (text) => sink.write(text) ? null : new Promise(resolve => sink.once("drain", resolve));
+  // Listen for errors from the start: an output error (eg. a full disk) would otherwise be
+  // an uncaught exception, and a write waiting for "drain" would never finish
+  let failed = null;
+  const failures = new Set();
+  const onError = (err) => {
+    failed ??= err;
+    for (const reject of failures) reject(err);
+  };
+  out.on("error", onError);
+  if (gzipped) sink.on("error", onError);
+  const wait = (event) => new Promise((resolve, reject) => {
+    if (failed) return reject(failed);
+    const done = () => {
+      failures.delete(reject);
+      resolve();
+    };
+    failures.add(reject);
+    (event === "drain" ? sink : out).once(event, done);
+  });
+  const write = (text) => {
+    if (failed) throw failed;
+    return sink.write(text) ? null : wait("drain");
+  };
 
+  try {
+    const rows = await copyRows(input, write, {columns, required, addColumns});
+    const finished = wait("finish");
+    sink.end();
+    await finished;
+    return rows;
+  } catch (err) {
+    sink.destroy();
+    out.destroy();
+    throw err;
+  }
+}
+
+async function copyRows(input, write, {columns, required, addColumns}) {
   let header = null;
   let indexes = null;
   let names = null;
   const added = Object.entries(addColumns);
   let rows = 0;
-  for await (const raw of readline.createInterface({input: createReadStream(input), crlfDelay: Infinity})) {
-    const line = header ? raw : raw.replace(/^\uFEFF/, "");
-    if (!line) continue;
-    if (!header) {
-      header = csvParseRows(line)[0];
-      const missing = [...Object.keys(columns || {}), ...required].filter(c => !header.includes(c));
-      if (missing.length) throw new Error(`Missing columns ${missing.join(", ")} (found ${header.join(", ")})`);
-      if (columns) indexes = Object.keys(columns).map(c => header.indexOf(c));
-      names = columns ? Object.values(columns) : header;
-      await write(`${columns || added.length ? csvFormatRows([[...names, ...added.map(([name]) => name)]]) : line}\n`);
-      continue;
+  const stream = createReadStream(input);
+  try {
+    for await (const raw of readline.createInterface({input: stream, crlfDelay: Infinity})) {
+      const line = header ? raw : raw.replace(/^\uFEFF/, "");
+      if (!line) continue;
+      if (!header) {
+        header = csvParseRows(line)[0];
+        const missing = [...Object.keys(columns || {}), ...required].filter(c => !header.includes(c));
+        if (missing.length) throw new Error(`Missing columns ${missing.join(", ")} (found ${header.join(", ")})`);
+        if (columns) indexes = Object.keys(columns).map(c => header.indexOf(c));
+        names = columns ? Object.values(columns) : header;
+        await write(`${columns || added.length ? csvFormatRows([[...names, ...added.map(([name]) => name)]]) : line}\n`);
+        continue;
+      }
+      rows ++;
+      if (!indexes && !added.length) {
+        await write(`${line}\n`);
+        continue;
+      }
+      const values = csvParseRows(line)[0];
+      const kept = indexes ? indexes.map(i => values[i]) : values;
+      const row = Object.fromEntries(names.map((name, i) => [name, kept[i]]));
+      await write(`${csvFormatRows([[...kept, ...added.map(([, value]) => value(row))]])}\n`);
     }
-    rows ++;
-    if (!indexes && !added.length) {
-      await write(`${line}\n`);
-      continue;
-    }
-    const values = csvParseRows(line)[0];
-    const kept = indexes ? indexes.map(i => values[i]) : values;
-    const row = Object.fromEntries(names.map((name, i) => [name, kept[i]]));
-    await write(`${csvFormatRows([[...kept, ...added.map(([, value]) => value(row))]])}\n`);
+  } finally {
+    stream.destroy();
   }
-  await new Promise((resolve, reject) => {
-    out.on("finish", resolve);
-    out.on("error", reject);
-    sink.end();
-  });
   return rows;
 }
 

@@ -131,9 +131,14 @@ function ringBounds(ring) {
 // contains it. The Geoportal's GeoJSON sometimes returns holes as separate polygons
 // (eg. Nottingham inside Nottinghamshire). Correctly structured geometry is unchanged,
 // and holes that aren't inside any outer ring are kept as polygons.
+// Geometry that can't be Esri-wound, where every polygon's outer ring is anticlockwise (eg.
+// RFC 7946 GeoJSON, should the Geoportal switch to it), is returned unchanged. GeoJSON
+// doesn't say which winding order it uses, so this is the only way to tell.
 export function fixRings(geometry) {
   if (!geometry || !["Polygon", "MultiPolygon"].includes(geometry.type)) return geometry;
-  const rings = (geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates).flat(1);
+  const parts = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  if (parts.every(p => p[0] && ringArea(p[0]) > 0)) return geometry;
+  const rings = parts.flat(1);
   const outers = rings.filter(r => ringArea(r) < 0);
   if (outers.length === 0) return geometry;
 

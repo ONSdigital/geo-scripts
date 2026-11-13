@@ -47,6 +47,19 @@ export function updateManifest(existing, tag, entries) {
   };
 }
 
+// The manifest entry for a local file, given its archived entry (previous, or undefined),
+// and whether the file needs uploading (upload) or just its manifest entry updating
+// (changed). A file whose dataset has changed but whose contents haven't (eg. a new
+// Geoportal version with the same boundaries) keeps its archived copy, but the entry
+// takes the new source, as download-files only uses archived files from the configured source.
+export function planEntry(previous, {sha256, size, source}, now = new Date().toISOString()) {
+  if (previous?.sha256 === sha256) {
+    if (previous.source === source) return {entry: previous, upload: false, changed: false};
+    return {entry: {...previous, source}, upload: false, changed: true};
+  }
+  return {entry: {sha256, size, source, archived: now}, upload: true, changed: true};
+}
+
 // What to remove so that the archive holds only the files the config names. configured
 // maps each tag in scope to the names of its configured files, and archived maps each
 // release to {assets: [names], manifest}. Releases outside configured are left alone,

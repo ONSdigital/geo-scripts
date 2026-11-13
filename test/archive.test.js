@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { tagFor, assetUrl, sha256File, getManifest, updateManifest, planPrune } from "../scripts/lib/archive.js";
+import { tagFor, assetUrl, sha256File, getManifest, updateManifest, planEntry, planPrune } from "../scripts/lib/archive.js";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -48,6 +48,20 @@ test("updateManifest keeps existing entries and replaces changed ones", () => {
   const updated = updateManifest(existing, "wd-2025", {"b.json.gz": {sha256: "3"}, "c.json.gz": {sha256: "4"}});
   assert.equal(updated.tag, "wd-2025");
   assert.deepEqual(updated.files, {"a.json.gz": {sha256: "1"}, "b.json.gz": {sha256: "3"}, "c.json.gz": {sha256: "4"}});
+});
+
+test("planEntry uploads new and changed files, and updates the source of unchanged ones", () => {
+  const now = "2026-11-13T00:00:00.000Z";
+  const previous = {sha256: "1", size: 10, source: "Wards_V1", archived: "2026-01-01T00:00:00.000Z"};
+  assert.deepEqual(planEntry(undefined, {sha256: "1", size: 10, source: "Wards_V1"}, now),
+    {entry: {sha256: "1", size: 10, source: "Wards_V1", archived: now}, upload: true, changed: true});
+  assert.deepEqual(planEntry(previous, {sha256: "2", size: 11, source: "Wards_V1"}, now),
+    {entry: {sha256: "2", size: 11, source: "Wards_V1", archived: now}, upload: true, changed: true});
+  assert.deepEqual(planEntry(previous, {sha256: "1", size: 10, source: "Wards_V1"}, now),
+    {entry: previous, upload: false, changed: false});
+  // A new dataset version with identical contents: keep the archived copy, but record the new source
+  assert.deepEqual(planEntry(previous, {sha256: "1", size: 10, source: "Wards_V2"}, now),
+    {entry: {...previous, source: "Wards_V2"}, upload: false, changed: true});
 });
 
 test("planPrune removes files and releases the config no longer names", () => {

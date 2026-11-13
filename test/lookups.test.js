@@ -61,3 +61,16 @@ test("writeLookup adds columns joined from another table, with a fallback for We
     rmSync(dir, {recursive: true, force: true});
   }
 });
+
+test("writeLookup rejects, rather than crashing, when the output can't be written", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "lookups-"));
+  try {
+    const input = join(dir, "in.csv");
+    writeFileSync(input, "a,b\n1,2\n");
+    for (const output of [join(dir, "missing", "out.csv"), join(dir, "missing", "out.csv.gz")]) {
+      await assert.rejects(writeLookup(input, output), {code: "ENOENT"});
+    }
+  } finally {
+    rmSync(dir, {recursive: true, force: true});
+  }
+});

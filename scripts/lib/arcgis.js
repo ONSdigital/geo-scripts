@@ -1,5 +1,5 @@
 // Helpers for the ONS Open Geography Portal's ArcGIS REST API.
-import { fetchJSON } from "./http.js";
+import { fetchJSON, withRetry } from "./http.js";
 
 export const SERVICES_URL = "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services";
 
@@ -34,6 +34,14 @@ export function checkResponse(json, id) {
   return json;
 }
 
+// Fetch from the API, checking for errors in the response. Retries cover both HTTP
+// errors and errors in the response body (other than unavailable datasets), which
+// fetchJSON's own retries can't see.
+export function fetchArcGIS(url, id, {retries = 3, backoff = 2000, ...opts} = {}) {
+  return withRetry(async () => checkResponse(await fetchJSON(url, {...opts, retries: 0}), id),
+    {retries, backoff, label: `Request to ${id}`});
+}
+
 // Pick the layer to use from a FeatureServer's service info. Geoportal datasets have a
 // single layer (or, for lookups, a single table), which is usually but not always id 0,
 // eg. some use layer 1 or 10.
@@ -50,15 +58,15 @@ export function pickLayer(service, id) {
 
 // The id of the dataset's layer, from the FeatureServer's list of layers
 export async function getLayerId(id) {
-  return pickLayer(checkResponse(await fetchJSON(`${serviceUrl(id)}?f=json`), id), id);
+  return pickLayer(await fetchArcGIS(`${serviceUrl(id)}?f=json`, id), id);
 }
 
 export async function getLayerInfo(id, layer = 0) {
-  return checkResponse(await fetchJSON(`${layerUrl(id, layer)}?f=json`), id);
+  return fetchArcGIS(`${layerUrl(id, layer)}?f=json`, id);
 }
 
 export async function getFeatureCount(id, layer = 0) {
-  const json = checkResponse(await fetchJSON(`${layerUrl(id, layer)}/query?where=1%3D1&returnCountOnly=true&f=json`), id);
+  const json = await fetchArcGIS(`${layerUrl(id, layer)}/query?where=1%3D1&returnCountOnly=true&f=json`, id);
   return json.count;
 }
 
@@ -91,7 +99,7 @@ export async function fetchAttributes(id, outFields, {layer = 0, orderBy} = {}) 
       f: "json"
     });
     if (orderBy) params.set("orderByFields", orderBy);
-    const json = checkResponse(await fetchJSON(`${layerUrl(id, layer)}/query?${params}`), id);
+    const json = await fetchArcGIS(`${layerUrl(id, layer)}/query?${params}`, id);
     if (!json.features?.length) break;
     rows.push(...json.features.map(f => f.attributes));
   }
@@ -136,7 +144,7 @@ export async function listServiceTitles() {
 }
 
 export async function listServices() {
-  const json = checkResponse(await fetchJSON(`${SERVICES_URL}?f=json`), "services");
+  const json = await fetchArcGIS(`${SERVICES_URL}?f=json`, "services");
   return json.services.filter(s => s.type === "FeatureServer").map(s => s.name);
 }
 

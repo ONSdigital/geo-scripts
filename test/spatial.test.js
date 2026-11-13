@@ -99,3 +99,14 @@ test("fixRings puts holes stored as separate polygons back into their outer ring
   // Points and lines are untouched
   assert.deepEqual(fixRings({type: "Point", coordinates: [1, 2]}), {type: "Point", coordinates: [1, 2]});
 });
+
+test("fixRings leaves RFC 7946 geometry (anticlockwise outer rings, clockwise holes) unchanged", async () => {
+  const { fixRings } = await import("../scripts/lib/spatial.js");
+  const outer = [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]];
+  const hole = [[4, 4], [4, 6], [6, 6], [6, 4], [4, 4]];
+  const island = [[20, 20], [22, 20], [22, 22], [20, 22], [20, 20]];
+  for (const geometry of [
+    {type: "Polygon", coordinates: [outer, hole]},
+    {type: "MultiPolygon", coordinates: [[outer, hole], [island]]}
+  ]) assert.deepEqual(fixRings(geometry), geometry);
+});

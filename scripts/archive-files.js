@@ -15,7 +15,7 @@ import { cli, selectGeos, isSelection } from "./lib/cli.js";
 import { expandGeoSources } from "./lib/sources.js";
 import { withRetry } from "./lib/http.js";
 import { readRecord, recordedOtherSource, sourceOf } from "./lib/local-sources.js";
-import { MANIFEST, tagFor, getManifest, sha256File, updateManifest, planPrune } from "./lib/archive.js";
+import { MANIFEST, tagFor, getManifest, sha256File, updateManifest, planEntry, planPrune } from "./lib/archive.js";
 
 const usage = `Usage: npm run archive-files -- [--geo wd] [--year 2025] [--lookups] [--prune] [--dry-run]
   --geo, --year  only archive boundaries/centroids for these geographies and years
@@ -103,22 +103,23 @@ for (const [tag, tagFiles] of byTag) {
   const existing = hasGh ? await readManifest(tag) : await getManifest(tag);
   const entries = {};
   const changed = [];
+  const resourced = [];
   for (const file of tagFiles) {
-    const sha256 = await sha256File(file.path);
     const previous = existing?.files?.[file.name];
-    if (previous?.sha256 === sha256) {
-      entries[file.name] = previous;
-    } else {
-      entries[file.name] = {sha256, size: statSync(file.path).size, source: sourceOf(file), archived: new Date().toISOString()};
-      changed.push(file);
-    }
+    const plan = planEntry(previous, {sha256: await sha256File(file.path), size: statSync(file.path).size, source: sourceOf(file)});
+    entries[file.name] = plan.entry;
+    if (plan.upload) changed.push(file);
+    else if (plan.changed) resourced.push({file, from: previous.source});
   }
 
-  if (changed.length === 0) {
+  if (changed.length === 0 && resourced.length === 0) {
     console.log(`${tag}: up to date`);
     continue;
   }
-  console.log(`${tag}: ${dryRun ? "would upload" : "uploading"} ${changed.map(f => `${f.name}${existing?.files?.[f.name] ? " (replacing)" : ""}`).join(", ")}`);
+  if (changed.length) console.log(`${tag}: ${dryRun ? "would upload" : "uploading"} ${changed.map(f => `${f.name}${existing?.files?.[f.name] ? " (replacing)" : ""}`).join(", ")}`);
+  for (const {file, from} of resourced) {
+    console.log(`${tag}: ${file.name} is unchanged, but ${dryRun ? "would be" : "is being"} recorded as from ${sourceOf(file)} (was ${from || "not recorded"})`);
+  }
   if (dryRun) continue;
 
   // Create the release if it doesn't exist yet
