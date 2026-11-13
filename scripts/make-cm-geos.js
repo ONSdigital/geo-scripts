@@ -1,9 +1,15 @@
 import { readdirSync } from "fs";
 import geos from "../config/geo-config.js";
+import { dirs } from "../config/paths.js";
+import { cli, selectGeos } from "./lib/cli.js";
+
+const usage = `Usage: npm run make-cm-geos -- [--geo ltla,msoa]
+  --geo  only convert these geographies (those with a cmkey in config/geo-config.js)`;
+const {selected} = cli(usage, opts => selectGeos(geos, opts, {years: false}));
 import { readGzip, writeGzip, mkdir } from "./utils.js";
 
 const geoCodes = {};
-for (const geo of geos) {
+for (const geo of selected) {
   if (geo.cmkey) {
     for (const cd of geo.codes) {
       if (!geo.cmfilter || geo.cmfilter.includes(cd[0])) geoCodes[cd] = geo;
@@ -55,13 +61,13 @@ function makeCmGeo(feature, geo) {
   };
 }
 
-const outdir = "./output/cm-geos";
+const outdir = dirs.cmGeos;
 
 // Create directory if needed
 mkdir(outdir);
 
 for (const cd of Object.keys(geoCodes)) {
-  const dir = `./output/geos/${cd}`;
+  const dir = `${dirs.geos}/${cd}`;
   const files = readdirSync(dir)
     .filter(f => f.slice(-5) === ".json");
   

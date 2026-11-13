@@ -1,4 +1,3 @@
-import https from "https";
 import fs from "fs";
 import zlib from "zlib";
 import { area, booleanPointInPolygon } from "@turf/turf";
@@ -6,6 +5,7 @@ import polylabel from "polylabel";
 import { exec } from "child_process";
 import * as d3 from "d3-dsv";
 import geo_config from "../config/geo-config.js";
+import { dirs } from "../config/paths.js";
 
 export function csvParse(str, row = d3.autoType) {
   return d3.csvParse(str.replace(/\uFEFF/, ''), row);
@@ -17,32 +17,13 @@ export function makeLookup(data, key = "areacd") {
   return lookup;
 }
 
-export function fetch(url) {
-  return new Promise((resolve) => {
-    https.get(url, (response) => {
-      let data = "";
-      response.on("data", (chunk) => {
-        data += chunk;
-      });
-      response.on("end", () => {
-        resolve(data);
-      });
-    })
-    .on("error", (err) => {
-      console.log("Error: " + err.message);
-    });
-  });
-}
-
-export async function download(url, dest) {
-  await run(`curl -L -o "${dest}" "${url}"`);
-  console.log(`Downloaded ${dest}`);
-  return;
-}
-
-export function run(cmd, opts) {
+export function run(cmd, opts = {}) {
+  // Extend rather than replace the environment, so that PATH etc. are kept
+  const env = opts.env ?
+    {...process.env, ...Object.fromEntries(Object.entries(opts.env).map(([k, v]) => [k, String(v)]))} :
+    process.env;
   return new Promise((resolve, reject) => {
-    exec(cmd, opts, (error, stdout, stderr) => {
+    exec(cmd, {maxBuffer: 1024 * 1024 * 64, ...opts, env}, (error, stdout, stderr) => {
       if (error) {
         reject(error);
         return;
@@ -68,6 +49,14 @@ export function readGzip(path) {
 
 export function writeGzip(path, data) {
   fs.writeFileSync(path, zlib.gzipSync(data));
+}
+
+// Gzip a file, keeping its filename (skipped if it's already gzipped)
+export function gzipInPlace(path) {
+  const data = fs.readFileSync(path);
+  if (data[0] === 0x1f && data[1] === 0x8b) return false;
+  writeGzip(path, data);
+  return true;
 }
 
 export function round(num, dp = 6) {
@@ -136,7 +125,7 @@ export function findPolylabel(feature) {
 
 export function getValidBoundariesPath(key, yr, detail = ["bfe", "bfc"]) {
   for (const det of detail) {
-    const path = `./input/boundaries/${key}${yr}_${det}.json.gz`;
+    const path = `${dirs.boundaries}/${key}${yr}_${det}.json.gz`;
     if (fs.existsSync(path)) return path;
   }
   console.log(`Valid file path not found for ${key} and ${yr}!`);

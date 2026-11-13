@@ -4,13 +4,18 @@ import readline from "line-by-line";
 import { booleanPointInPolygon, intersect, area, booleanContains, booleanIntersects } from "@turf/turf";
 import { csvFormat } from "d3-dsv";
 import { csvParse, getValidBoundariesPath } from "./utils.js";
+import { bboxIndex } from "./lib/spatial.js";
 import geo_config from "../config/geo-config.js";
+import { files } from "../config/paths.js";
+import { cli, rejectSelection } from "./lib/cli.js";
+
+const {opts} = cli("Usage: npm run get-relations");
+rejectSelection(opts, "the master lookup needs every geography and year in config/geo-config.js");
 
 const startTime = new Date();
 
-const data_path = "./input/lookups/lookup_metadata.csv";
-const outpath = "./input/lookups/lookup.csv";
-const cauth_path = "./input/lookups/lookup_cauth.csv";
+const data_path = files.metadata;
+const outpath = files.lookup;
 
 const cols = [
   "areacd", "areanm", "areanmw",
@@ -166,6 +171,20 @@ for (const d of data) {
   data_indexed[d.areacd] = d;
 }
 
+// Grid indexes of each group's bboxes, so each area is only compared with nearby
+// candidate parents/successors (in their original order, which breaks ties later)
+const group_indexes = {};
+function groupIndex(cd) {
+  if (!group_indexes[cd]) {
+    const bounds = (data_grouped[cd] || []).map(d => d.bounds);
+    const sizes = bounds.map(b => Math.max(b[2] - b[0], b[3] - b[1])).sort((a, b) => a - b);
+    const cellSize = Math.min(Math.max(sizes[Math.floor(sizes.length / 2)] || 1, 0.01), 1);
+    group_indexes[cd] = bboxIndex(bounds, cellSize);
+  }
+  return group_indexes[cd];
+}
+const candidates = (cd, d) => groupIndex(cd).queryPoint(d.centroid).map(i => data_grouped[cd][i]);
+
 const parents = {};
 const poss_children = {};
 const poss_parents = {};
@@ -180,7 +199,7 @@ for (const d of data) {
     if (!parent_grps.includes(cd)) parent_grps.push(cd);
     p_parents = [
       ...p_parents,
-      ...data_grouped[cd].filter(p => isParent(p, d) && isMatchingYear(p, d)).map(p => p.areacd)
+      ...candidates(cd, d).filter(p => isParent(p, d) && isMatchingYear(p, d)).map(p => p.areacd)
     ];
   }
   if (p_parents.length === 1) {
@@ -191,7 +210,8 @@ for (const d of data) {
       poss_children[p].push(d.areacd);
     }
     poss_parents[d.areacd] = p_parents;
-  } else {
+  } else if (lookup[grp].parents.length > 0) {
+    // (Top-level geographies, eg. the UK, have no parents to find)
     console.log(`No possible parents found for ${d.areanm} (${d.areacd})!`);
   }
   i ++;
@@ -204,16 +224,20 @@ const poss_successors = {};
 const successor_grps = [];
 
 i = 0;
+// Areas that end because their geography was abolished (lastYear) have no successors
+const lastYears = {};
+for (const geo of geo_config) if (geo.lastYear) for (const cd of geo.codes) lastYears[cd] = geo.lastYear;
+
 console.log("Finding possible successors by bbox...")
 for (const d of data) {
-  if (d.end) {
+  if (d.end && d.end !== lastYears[d.areacd.slice(0, 3)]) {
     const grp = d.areacd.slice(0, 3);
     if (!successor_grps.includes(grp)) successor_grps.push(grp);
     let p_successors = [];
     for (const cd of lookup[grp].siblings) {
       p_successors = [
         ...p_successors,
-        ...data_grouped[cd].filter(s => isNextYear(s, d) && isParent(s, d)).map(s => s.areacd)
+        ...candidates(cd, d).filter(s => isNextYear(s, d) && isParent(s, d)).map(s => s.areacd)
       ];
     }
     if (p_successors.length === 1) {
@@ -276,14 +300,6 @@ for (const d of data) {
 
 writeFileSync(outpath, csvFormat(data, cols));
 console.log(`Wrote ${outpath}`);
-
-console.log("Making CAUTH lookup...");
-const cauth_lookup = data
-  .filter(d => d?.parentcd?.slice(0, 3) === "E47" && !d.end)
-  .map(d => ({areacd: d.areacd, cauth: true}));
-
-writeFileSync(cauth_path, csvFormat(cauth_lookup));
-console.log(`Wrote ${cauth_path}`);
 
 const endTime = new Date();
 const duration = Math.round((endTime - startTime) / 1000);

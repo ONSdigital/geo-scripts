@@ -1,11 +1,12 @@
-import { readdirSync } from "fs";
+import { createReadStream } from "fs";
+import zlib from "zlib";
 import LineByLineReader from "line-by-line";
-import { unzip, clearTemp, writeGzip, mkdir } from "./utils.js";
+import { writeGzip, mkdir } from "./utils.js";
+import { dirs, files } from "../config/paths.js";
 
-const zip_path = "./input/other/nspl.zip";
-const temp_dir = "./temp";
-const data_dir = `${temp_dir}/Data`
-const out_dir = "./output/postcodes";
+// The NSPL, as a gzipped CSV of every postcode (see config/source-files.js)
+const in_path = files.nspl;
+const out_dir = dirs.postcodes;
 
 const cols = [
   {source: "pcds", target: "cd", type: "string"},
@@ -18,23 +19,26 @@ function getCols(row) {
   return cols;
 }
 
-await clearTemp();
-
-console.log(`Unzipping ${zip_path}`);
-await unzip(zip_path, temp_dir);
-
 console.log(`Creating output directory ${out_dir}`);
 mkdir(out_dir);
+console.log(`Reading ${in_path}`);
 
-const in_file = readdirSync(data_dir).find(file => file.slice(-4) === ".csv");
-const in_path = `${data_dir}/${in_file}`;
+// Postcodes are listed in standard 7-character order (outward code padded to 4
+// characters, eg. "PO1 4AA" before "PO141AA"), whatever order the NSPL rows are in
+const sortKey = (pcds) => {
+  const [outward, inward = ""] = pcds.split(" ");
+  return outward.padEnd(4, " ") + inward;
+};
+const byKey = (a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
 
 let fileCols;
 let lines = 0;
 
+// Postcodes by prefix. Prefixes of 1-3 characters keep just the first 10 postcodes;
+// 4-character prefixes keep them all.
 const chunks = {};
 
-const lr = new LineByLineReader(in_path);
+const lr = new LineByLineReader(createReadStream(in_path).pipe(zlib.createGunzip()));
 
 lr.on('line', function (line) {
 	if (lines === 0) {
@@ -46,32 +50,35 @@ lr.on('line', function (line) {
       index[fileCols[i]] = arr[i];
     }
     if (index.lat) {
+      const row = {key: sortKey(index.pcds)};
+      for (const col of cols) row[col.target] = col.type === "number" ? +index[col.source] : index[col.source];
       const cd = index.pcds.replaceAll(" ", "");
       const prefixes = [cd.slice(0, 1), cd.slice(0, 2), cd.slice(0, 3), cd.slice(0, 4)];
       for (const prefix of prefixes) {
-        if (!chunks[prefix]) {
-          chunks[prefix] = {};
-          for (const col of cols) chunks[prefix][col.target] = [];
-        }
-        if (prefix.length > 3 || chunks[prefix][cols[0].target].length < 10) {
-          for (const col of cols) chunks[prefix][col.target].push(
-            col.type === "number" ? +index[col.source] : index[col.source]
-          );
+        const chunk = chunks[prefix] ||= [];
+        if (prefix.length > 3) chunk.push(row);
+        else if (chunk.length < 10 || row.key < chunk[chunk.length - 1].key) {
+          // Keep the 10 first postcodes in order
+          chunk.push(row);
+          chunk.sort(byKey);
+          if (chunk.length > 10) chunk.pop();
         }
       }
     }
   }
   lines += 1;
-  if (lines % 1000 === 0) console.log(`${lines.toLocaleString()} lines processed...`)
+  if (lines % 100000 === 0) console.log(`${lines.toLocaleString()} lines processed...`)
 });
 
 lr.on('end', function () {
   for (const prefix in chunks) {
+    const rows = chunks[prefix].sort(byKey);
+    const json = {};
+    for (const col of cols) json[col.target] = rows.map(r => r[col.target]);
     const path = `${out_dir}/${prefix}.json`;
-    writeGzip(path, JSON.stringify(chunks[prefix]));
+    writeGzip(path, JSON.stringify(json));
     console.log(`Wrote ${path}`);
   }
-  clearTemp();
 });
 
 lr.on('error', function (err) {

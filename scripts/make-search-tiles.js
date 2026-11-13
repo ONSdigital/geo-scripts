@@ -1,11 +1,18 @@
-import { readFileSync, writeFileSync, appendFileSync, createReadStream } from "fs";
+import { readFileSync, writeFileSync, appendFileSync, createReadStream, rmSync } from "fs";
 import zlib from "zlib";
 import readline from "line-by-line";
 import geos from "../config/geo-config.js";
+import { dirs, files } from "../config/paths.js";
+import { cli, rejectSelection } from "./lib/cli.js";
+import { createTileSplitter } from "./lib/tiles.js";
+
+const {opts} = cli("Usage: npm run make-search-tiles");
+rejectSelection(opts, "search tiles combine every geography");
 import { run, getValidBoundariesPath, writeGzip, clearTemp, mkdir, csvParse } from "./utils.js";
 
 const sources = geos
-  .filter(g => g.key !== "uk")
+  // Virtual geographies (eg. the UK) cover everything, so aren't useful for search
+  .filter(g => !g.virtual)
   .map(g => {
     const paths = g.years.map(year => getValidBoundariesPath(g.key, `${year}`.slice(-2), ["bgc", "bfc"])).reverse();
     const outpath = `./temp/${g.key}.json`;
@@ -51,55 +58,34 @@ async function mergeSourceFiles(source, lookup) {
   await run(`gzip ${source.outpath}`);
 }
 
-function makeGeoJSONTiles(path, yr) {
+function makeGeoJSONTiles(path) {
   return new Promise((resolve) => {
     console.log(`Making GeoJSON tiles from ${path}...`);
     const lineReader = new readline(path);
 
-    let currentTile;
+    const splitter = createTileSplitter(({x, y, features}) => {
+      const dir = `${dirs.search}/${x}`;
+      const path = `${dir}/${y}.json`;
+      mkdir(dir);
+      writeGzip(path, JSON.stringify({type: "FeatureCollection", features}));
+      console.log(`Wrote ${path}`);
+    });
 
     lineReader.on('line', (line) => {
       lineReader.pause();
-      
-      if (line.startsWith('{ "type": "FeatureCollection", "properties": { "zoom":')) {
-        if (currentTile && currentTile.json.features.length > 0) {
-          mkdir(currentTile.dir);
-          writeGzip(currentTile.path, JSON.stringify(currentTile.json));
-          console.log(`Wrote ${currentTile.path}`);
-        }
-        // const z = +line.match(/(?<="zoom":\s)\d+(?=,)/)[0];
-        const x = +line.match(/(?<="x":\s)\d+(?=,)/)[0];
-        const y = +line.match(/(?<="y":\s)\d+(?=\s)/)[0];
-        const dir = `./output/search${yr}/${x}`;
-        const path = `${dir}/${y}.json`;
-        const json = {type: "FeatureCollection", features: []};
-        currentTile = {dir, path, json};
-      }
-
-      let feature;
-
-      try {
-        feature = JSON.parse(line);
-      }
-      catch {
-        // Suppress parsing errors
-      }
-
-      if (feature?.type === "Feature") {
-        currentTile.json.features.push(feature);
-      }
-
+      splitter.line(line);
       lineReader.resume();
     });
 
     lineReader.on("end", async () => {
+      splitter.end();
       resolve();
     });
   });
 }
 
 // Load lookup data
-const lookup_path = "./input/lookups/lookup.csv";
+const lookup_path = files.lookup;
 const lookup_raw = readFileSync(lookup_path, {encoding: 'utf8', flag: 'r'});
 const lookup_data = csvParse(lookup_raw);
 const lookup = {};
@@ -122,6 +108,8 @@ console.log("Unpacking search tiles...");
 const unpackCmd = `tippecanoe-decode ${output} > ${json_path}`;
 await run(unpackCmd);
 
-await makeGeoJSONTiles(json_path, yr);
+// The output folder isn't versioned, so clear tiles from any previous run
+rmSync(dirs.search, {recursive: true, force: true});
+await makeGeoJSONTiles(json_path);
 
 clearTemp();

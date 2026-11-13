@@ -1,15 +1,23 @@
-import { readFileSync, existsSync, createReadStream } from "fs";
+import { readFileSync, rmSync, createReadStream } from "fs";
 import zlib from "zlib";
 import readline from "line-by-line";
-import mapshaper from "mapshaper";
-import { bbox } from "@turf/turf";
-import { readGzip, writeGzip, csvParse, findPolylabel, roundAll, mkdir } from "./utils.js";
+import { writeGzip, csvParse, mkdir } from "./utils.js";
 import geos from "../config/geo-config.js";
 import types from "../config/geo-types.js";
+import { dirs, files } from "../config/paths.js";
+import { cli, selectGeos } from "./lib/cli.js";
+import { groupChildren } from "./lib/children.js";
+
+const usage = `Usage: npm run make-geos -- [--geo ltla,wd] [--clean]
+  --geo    only generate files for these geographies (from config/geo-config.js)
+  --clean  delete existing files for the selected geographies first (removes areas no longer in the lookup)`;
+const {opts, selected} = cli(usage, opts => selectGeos(geos, opts, {years: false}));
 
 const startTime = new Date();
 
-const dirs = ["geos", "cm-geos"];
+// Areas written so far: each area is written once, from the newest year it appears in
+const written = new Set();
+
 
 function propsToNames(props, extraCols = []) {
   const newprops = {areacd: props.areacd};
@@ -37,24 +45,36 @@ function childYearValid(parent, child) {
   return true;
 }
 
-function getChildren(lookup, lookup_data, code) {
-  let children = lookup_data.filter(d => d.parentcd === code && childYearValid(lookup[code], d));
+// Rows of the lookup grouped by a column, in their original order
+function groupBy(data, key) {
+  const groups = new Map();
+  for (const d of data) {
+    if (!d[key]) continue;
+    const group = groups.get(d[key]);
+    if (group) group.push(d);
+    else groups.set(d[key], [d]);
+  }
+  return groups;
+}
+
+function getChildren(lookup, by_parent, code) {
+  let children = (by_parent.get(code) || []).filter(d => childYearValid(lookup[code], d));
   return children.map(child => propsToNames(child))
     .sort((a, b) => a.areacd.localeCompare(b.areacd));
 }
 
-function getSuperseded(lookup_data, code) {
-  let superseded = lookup_data.filter(d => d.successorcd === code);
+function getSuperseded(by_successor, code) {
+  let superseded = by_successor.get(code) || [];
   return superseded.map(sup => propsToNames(sup))
     .sort((a, b) => a.areacd.localeCompare(b.areacd));
 }
 
-function makeGeo(geo, year, lookup_data, lookup, census_lookup) {
+function makeGeo(geo, year, indexes, lookup, census_lookup) {
   return new Promise((resolve) => {
     const yr = String(year).slice(-2);
     const detail = geo.detail || "bgc";
     const dp = detail === "bfc" ? 6 : detail === "buc" ? 4 : 5;
-    const geo_path = `./input/boundaries/${geo.key}${yr}_${detail}.json.gz`;
+    const geo_path = files.boundary(geo.key, year, detail);
 
     console.log(`Generating geo files from ${geo_path}`);
     const lineReader = new readline(createReadStream(geo_path).pipe(zlib.createGunzip()));
@@ -64,15 +84,20 @@ function makeGeo(geo, year, lookup_data, lookup, census_lookup) {
       const feature = JSON.parse(line);
       const areacd = feature.properties.areacd;
       const typecd = areacd.slice(0, 3);
-      const dir = `./output/geos/${typecd}`;
+      const dir = `${dirs.geos}/${typecd}`;
       const path = `${dir}/${areacd}.json`;
 
-      if (!existsSync(path) && geo.codes.includes(typecd)) {
+      if (!written.has(areacd) && geo.codes.includes(typecd)) {
+        written.add(areacd);
         // Make simple props
         const lkp = lookup[areacd];
+        if (!lkp) {
+          console.error(`${areacd} (in ${geo_path}) isn't in ${files.lookup}. The lookup is out of date: run get-metadata and get-relations (or npm run process-sources) first.`);
+          process.exit(1);
+        }
         const props = propsToNames(
           lkp,
-          ["bounds", "centroid", "area_km2", "start", "end"]
+          ["bounds", "centroid", "areakm2", "start", "end"]
         );
 
         // Add additional props
@@ -88,15 +113,21 @@ function makeGeo(geo, year, lookup_data, lookup, census_lookup) {
 
         // Add superseded geographies for new geographies
         if (lkp.start) {
-          props.replaces = getSuperseded(lookup_data, areacd);
+          props.replaces = getSuperseded(indexes.by_successor, areacd);
         }
 
-        // Add parents and children
-        props.children = getChildren(lookup, lookup_data, areacd);
-        props.child_typecds = props.children[0] ?
-          Array.from(new Set(props.children.map(c => c.areacd.slice(0, 3)))).sort((a, b) => a.localeCompare(b)) :
-          [];
-        props.parents = getParents(lookup, areacd);
+        // Add parents and children. Virtual geographies outside the hierarchy (eg. Great
+        // Britain) take them from their config: their member countries, and the UK.
+        const outside = geo.virtual?.parent;
+        const children = outside ?
+          geo.virtual.members.map(cd => propsToNames(lookup[cd])) :
+          getChildren(lookup, indexes.by_parent, areacd);
+        // Children grouped by kind of area, eg. a region's authorities, then its constituencies
+        props.children = groupChildren(children, geos);
+        props.child_typecds = Array.from(new Set(children.map(c => c.areacd.slice(0, 3)))).sort((a, b) => a.localeCompare(b));
+        props.parents = outside ?
+          [propsToNames(lookup[geo.virtual.parent], ["start", "end"])] :
+          getParents(lookup, areacd);
 
         // Add census best-fit lookups
         const keys = ["oa", "lsoa", "msoa"];
@@ -126,47 +157,8 @@ function makeGeo(geo, year, lookup_data, lookup, census_lookup) {
   });
 }
 
-function makeMergedGeo(props, childcds) {
-  return new Promise((resolve) => {
-    console.log(`Creating merged geography ${props.areanm} (${props.areacd}) from ${childcds.join(", ")}`);
-    const geojson = {type: "FeatureCollection", features: []};
-    for (const ccd of childcds) {
-      const path = `./output/geos/${ccd.slice(0, 3)}/${ccd}.json`;
-      const feature = JSON.parse(readGzip(path));
-      feature.properties.areacd = props.areacd;
-      geojson.features.push(feature);
-    }
-
-    mapshaper.applyCommands("-i input.geojson -dissolve2 fields=areacd -o output.geojson", {"input.geojson": geojson}, (err, output) => {
-      const merged = JSON.parse(output["output.geojson"]).features[0];
-      
-      const ft = geojson.features.map(f => f.properties);
-      if (!props.groupcd) props.groupcd = null;
-      if (!props.groupnm) props.groupnm = props.areanm.toLowerCase();
-      props.typecd = props.areacd.slice(0, 3);
-      if (!props.typenm) props.typenm = props.areanm.toLowerCase();
-      props.areakm2 = ft.reduce((a, b) => a.areakm2 + b.areakm2, 0);
-      props.bounds = bbox(merged);
-      props.centroid = roundAll(findPolylabel(merged));
-      props.children = ft.map(f => propsToNames(f));
-      props.child_typecds = ft.map(f => propsToNames(f));
-      props.parents = ft[0].parents;
-
-      const outdir = `./output/geos/${props.areacd.slice(0, 3)}`;
-      mkdir(outdir);
-
-      const outpath = `${outdir}/${props.areacd}.json`;
-      const feature = {type: "Feature", properties: props, geometry: merged.geometry};
-
-      writeGzip(outpath, JSON.stringify(feature));
-      console.log(`Wrote merged geography to ${outpath}`);
-      resolve();
-    });
-  });
-}
-
 // Load source data
-const lookup_path = "./input/lookups/lookup.csv";
+const lookup_path = files.lookup;
 const lookup_raw = readFileSync(lookup_path, {encoding: 'utf8', flag: 'r'});
 const lookup_data = csvParse(lookup_raw)
   .map(d => ({
@@ -176,32 +168,33 @@ const lookup_data = csvParse(lookup_raw)
   }));
 const lookup = {};
 for (const d of lookup_data) lookup[d.areacd] = d;
+const indexes = {
+  by_parent: groupBy(lookup_data, "parentcd"),
+  by_successor: groupBy(lookup_data, "successorcd")
+};
 
 // Load census lookups
 const census_lookup = {};
 for (const key of ["oa", "lsoa", "msoa"]) {
-  const path = `./input/lookups/lookup_bestfit_${key}21.json`;
+  const path = files.bestFit(key);
   census_lookup[key] = JSON.parse(readFileSync(path, {encoding: 'utf8', flag: 'r'}));
 }
 
-// Make directories if needed
-for (const dir of dirs) {
-  const path = `./output/${dir}`;
-  mkdir(path);
-}
-
-// Generate geo files
-for (const geo of geos) {
-  for (let year of [...geo.years].reverse()) {
-    await makeGeo(geo, year, lookup_data, lookup, census_lookup);
+// Make output directory if needed, and remove old files if requested
+mkdir(dirs.geos);
+if (opts.clean) {
+  for (const code of selected.flatMap(g => g.codes)) {
+    console.log(`Removing ${dirs.geos}/${code}`);
+    rmSync(`${dirs.geos}/${code}`, {recursive: true, force: true});
   }
 }
 
-// Make England and Wales file
-await makeMergedGeo(
-  {areacd: "K04000001", areanm: "England and Wales", areanmw: "Cymru a Lloegr", groupcd: "ew"},
-  ["E92000001", "W92000004"]
-);
+// Generate geo files
+for (const geo of selected) {
+  for (let year of [...geo.years].reverse()) {
+    await makeGeo(geo, year, indexes, lookup, census_lookup);
+  }
+}
 
 const endTime = new Date();
 const duration = Math.round((endTime - startTime) / 1000);

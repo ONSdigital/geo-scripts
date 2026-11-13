@@ -3,8 +3,9 @@
 import { readdirSync } from "fs";
 import { booleanPointInPolygon } from "@turf/turf";
 import { readGzip } from "./utils.js";
+import { dirs } from "../config/paths.js";
 
-const geo_dir = "./output/geos";
+const geo_dir = dirs.geos;
 const types = readdirSync(geo_dir).filter(t => t.match(/[EKNSW]{1}\d{2}/));
 
 let total = 0;
