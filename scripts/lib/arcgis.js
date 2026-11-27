@@ -1,0 +1,193 @@
+// Helpers for the ONS Open Geography Portal's ArcGIS REST API.
+import { fetchJSON, withRetry } from "./http.js";
+
+export const SERVICES_URL = "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services";
+
+export const serviceUrl = (id) => `${SERVICES_URL}/${encodeURIComponent(id)}/FeatureServer`;
+export const layerUrl = (id, layer = 0) => `${serviceUrl(id)}/${layer}`;
+
+export class ArcGISError extends Error {
+  constructor(message, code, id) {
+    super(message);
+    this.name = "ArcGISError";
+    this.code = code;
+    this.id = id;
+    // Missing or retired datasets won't come back on a retry
+    this.unavailable = code === 499 || code === 403 || /invalid url|not found|token required/i.test(message);
+    this.retryable = !this.unavailable;
+  }
+}
+
+// The API reports errors with an HTTP 200 and an {"error": {...}} body
+export function checkResponse(json, id) {
+  if (json?.error) {
+    const {code, details = []} = json.error;
+    const message = json.error.message || details[0] || "Unknown error";
+    const extra = details.filter(d => d !== message);
+    const err = new ArcGISError(`${message}${extra.length ? ` (${extra.join("; ")})` : ""}`, code, id);
+    if (err.unavailable) {
+      err.message = `Dataset "${id}" is unavailable from the Geoportal API: ${err.message.replace(/\.$/, "")}. ` +
+        "It may have been retired or replaced by a new version - run `npm run check-sources` to find replacements.";
+    }
+    throw err;
+  }
+  return json;
+}
+
+// Fetch from the API, checking for errors in the response. Retries cover both HTTP
+// errors and errors in the response body (other than unavailable datasets), which
+// fetchJSON's own retries can't see.
+export function fetchArcGIS(url, id, {retries = 3, backoff = 2000, ...opts} = {}) {
+  return withRetry(async () => checkResponse(await fetchJSON(url, {...opts, retries: 0}), id),
+    {retries, backoff, label: `Request to ${id}`});
+}
+
+// Pick the layer to use from a FeatureServer's service info. Geoportal datasets have a
+// single layer (or, for lookups, a single table), which is usually but not always id 0,
+// eg. some use layer 1 or 10.
+export function pickLayer(service, id) {
+  const layers = [...(service.layers || []), ...(service.tables || [])];
+  if (layers.length !== 1) {
+    const found = layers.map(l => `${l.id} (${l.name})`).join(", ");
+    const err = new ArcGISError(`Expected one layer in "${id}" but found ${layers.length}${found ? `: ${found}` : ""}`, null, id);
+    err.retryable = false;
+    throw err;
+  }
+  return layers[0].id;
+}
+
+// The id of the dataset's layer, from the FeatureServer's list of layers
+export async function getLayerId(id) {
+  return pickLayer(await fetchArcGIS(`${serviceUrl(id)}?f=json`, id), id);
+}
+
+export async function getLayerInfo(id, layer = 0) {
+  return fetchArcGIS(`${layerUrl(id, layer)}?f=json`, id);
+}
+
+export async function getFeatureCount(id, layer = 0) {
+  const json = await fetchArcGIS(`${layerUrl(id, layer)}/query?where=1%3D1&returnCountOnly=true&f=json`, id);
+  return json.count;
+}
+
+export function queryUrl(id, {layer = 0, offset = 0, limit = 2000, orderBy} = {}) {
+  const params = new URLSearchParams({
+    where: "1=1",
+    outFields: "*",
+    resultRecordCount: limit,
+    resultOffset: offset,
+    outSR: 4326,
+    f: "geojson"
+  });
+  // Paging is only guaranteed to be stable with an explicit order
+  if (orderBy) params.set("orderByFields", orderBy);
+  return `${layerUrl(id, layer)}/query?${params}`;
+}
+
+// Fetch attribute values only (no geometry), eg. to get a dataset's area codes
+// without downloading its boundaries. Returns an array of {field: value} rows.
+export async function fetchAttributes(id, outFields, {layer = 0, orderBy} = {}) {
+  const expected = await getFeatureCount(id, layer);
+  const rows = [];
+  while (rows.length < expected) {
+    const params = new URLSearchParams({
+      where: "1=1",
+      outFields: outFields.join(","),
+      returnGeometry: false,
+      resultRecordCount: 2000,
+      resultOffset: rows.length,
+      f: "json"
+    });
+    if (orderBy) params.set("orderByFields", orderBy);
+    const json = await fetchArcGIS(`${layerUrl(id, layer)}/query?${params}`, id);
+    if (!json.features?.length) break;
+    rows.push(...json.features.map(f => f.attributes));
+  }
+  if (rows.length !== expected) throw new Error(`Expected ${expected} rows from ${id} but received ${rows.length}`);
+  return rows;
+}
+
+// Map the dataset's {CODE}{YY}CD/NM/NMW fields to areacd/areanm/areanmw.
+// Field-name case varies between datasets, so match case-insensitively.
+export function resolveFields(fields, code, yr) {
+  const names = fields.map(f => f.name);
+  const mapping = [];
+  for (const ext of ["cd", "nm", "nmw"]) {
+    const target = `${code}${yr}${ext}`.toLowerCase();
+    const key = names.find(n => n.toLowerCase() === target);
+    if (key) mapping.push({key, label: `area${ext}`});
+    else if (ext === "cd") {
+      const codeFields = names.filter(n => /\d\dcd$/i.test(n));
+      throw new Error(`Expected a ${code}${yr}CD field but found ${codeFields.length ? codeFields.join(", ") : "none"} ` +
+        `(all fields: ${names.join(", ")}). Check the "code" and year in config/source-files.js.`);
+    }
+  }
+  return mapping;
+}
+
+// Titles of the Geoportal's feature services, by service name. Titles follow the naming
+// conventions more consistently than service names (eg. the service
+// "main_ONS_BUA_2024_EW_V2" is titled "Built Up Areas (December 2024) Boundaries EW BGG (V2)").
+export async function listServiceTitles() {
+  const titles = new Map();
+  const query = encodeURIComponent(`orgid:${SERVICES_URL.split("/")[3]} type:"Feature Service"`);
+  for (let start = 1; start > 0;) {
+    const json = await fetchJSON(`https://www.arcgis.com/sharing/rest/search?q=${query}&num=100&start=${start}&f=json`);
+    if (json.error) throw new Error(`Couldn't list dataset titles: ${json.error.message}`);
+    for (const item of json.results) {
+      const name = item.url?.match(/\/services\/([^/]+)\/FeatureServer/)?.[1];
+      if (name) titles.set(decodeURIComponent(name), item.title);
+    }
+    start = json.nextStart;
+  }
+  return titles;
+}
+
+export async function listServices() {
+  const json = await fetchArcGIS(`${SERVICES_URL}?f=json`, "services");
+  return json.services.filter(s => s.type === "FeatureServer").map(s => s.name);
+}
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const DETAILS = {
+  bfe: "bfe", bfc: "bfc", bgc: "bgc", bsc: "bsc", buc: "buc", pwc: "pwc",
+  // Older naming conventions
+  feb: "bfe", fcb: "bfc", gcb: "bgc", sgcb: "bsc", ugcb: "buc",
+  // Grid generalised (eg. built-up areas), the most detailed level published for them
+  bgg: "bfc"
+};
+
+// Break a Geoportal service name into its parts, eg.
+// "LAD_MAY_2025_UK_BGC_V2" -> {family: "lad", month: "may", year: 2025, detail: "bgc", version: 2}
+// "Wards_December_2024_Boundaries_UK_BFC" -> {family: "wards", month: "dec", year: 2024, detail: "bfc", version: 0}
+export function parseServiceName(name) {
+  const tokens = name.replace(/[()]/g, "").split("_").filter(t => t);
+  const lower = tokens.map(t => t.toLowerCase());
+  const yearIndex = lower.findIndex(t => /^(19|20)\d\d$/.test(t));
+  if (yearIndex < 1) return null;
+
+  let familyEnd = yearIndex;
+  let month = null;
+  const monthToken = lower[yearIndex - 1]?.slice(0, 3);
+  if (MONTHS.includes(monthToken)) {
+    month = monthToken;
+    familyEnd = yearIndex - 1;
+  }
+  if (familyEnd < 1) return null;
+
+  const rest = lower.slice(yearIndex + 1);
+  const detailToken = rest.find(t => DETAILS[t]);
+  const versionToken = rest.find(t => /^v\d+$/.test(t));
+  return {
+    name,
+    family: lower.slice(0, familyEnd).join("_"),
+    month,
+    year: +lower[yearIndex],
+    detail: detailToken ? DETAILS[detailToken] : null,
+    version: versionToken ? +versionToken.slice(1) : 0,
+    // Plural/singular forms are used interchangeably, eg. Output_Area(s)
+    familyKey: lower.slice(0, familyEnd).map(t => t.replace(/s$/, "")).join("_"),
+    // Variants with extra fields (eg. rural-urban classification) or names-and-codes tables
+    variant: rest.includes("ruc") || rest.includes("nc")
+  };
+}

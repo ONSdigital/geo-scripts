@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "all-scripts": "npm run download-files && npm run get-metadata && npm run get-relations && npm run make-lists && npm run get-best-fits && npm run make-geos",
+    "test": "node --test \"test/*.test.js\"",
+    "process-sources": "node ./scripts/process-sources.js",
     "download-files": "node ./scripts/download-files.js",
+    "make-virtual-boundaries": "node ./scripts/make-virtual-boundaries.js",
     "get-metadata": "node ./scripts/get-metadata.js",
     "get-relations": "node ./scripts/get-relations.js",
     "get-best-fits": "node ./scripts/get-best-fits.js",
@@ -19,6 +20,8 @@
     "make-postcodes": "node ./scripts/make-postcodes.js",
     "make-search-tiles": "node ./scripts/make-search-tiles.js",
     "zip-vtiles": "node ./scripts/zip-vtiles.js",
+    "check-sources": "node ./scripts/check-sources.js",
+    "archive-files": "node ./scripts/archive-files.js",
     "check-centroids": "node ./scripts/check-centroids.js"
   },
   "author": "Ahmad Barclay",

@@ -1,17 +1,22 @@
-import { readdirSync, readFileSync, writeFileSync, createReadStream } from "fs";
+import { existsSync, readFileSync, writeFileSync, createReadStream } from "fs";
 import zlib from "zlib";
 import readline from "line-by-line";
 import { csvFormat } from "d3-dsv";
 import { bbox, area } from "@turf/turf";
 import { csvParse, round, roundAll, findPolylabel } from "./utils.js";
 import geo_config from "../config/geo-config.js";
+import { dirs, files } from "../config/paths.js";
+import { cli, rejectSelection } from "./lib/cli.js";
+
+const {opts} = cli("Usage: npm run get-metadata");
+rejectSelection(opts, "the master lookup needs every geography and year in config/geo-config.js");
 
 const startTime = new Date();
 
-const geo_dir = "./input/boundaries"
-const msoa_path = "./input/other/msoa_names.csv";
-const outpath = "./input/lookups/lookup_metadata.csv";
-const names_outpath = "./input/lookups/lookup_names.csv";
+const geo_dir = dirs.boundaries;
+const msoa_path = files.msoaNames;
+const outpath = files.metadata;
+const names_outpath = files.names;
 
 const cols = [
   "areacd", "areanm", "areanmw",
@@ -31,7 +36,7 @@ let typeyrs = {};
 function getGeoMetadata(geo) {
   return new Promise((resolve) => {
     const filter = geo_config.find(d => d.key === geo.cd)?.codes;
-    const input = `./input/boundaries/${geo.path}`;
+    const input = `${geo_dir}/${geo.path}`;
 
     console.log(`Getting metadata from ${geo.path}`);
     const keys = [];
@@ -42,14 +47,29 @@ function getGeoMetadata(geo) {
     lineReader.on('line', (line) => {
       lineReader.pause();
       const feature = JSON.parse(line);
+      // Trim names, and drop blank ones (source files use " " for a missing Welsh name)
+      for (const key of Object.keys(feature.properties)) {
+        const value = feature.properties[key];
+        if (typeof value === "string") {
+          if (value.trim()) feature.properties[key] = value.trim();
+          else delete feature.properties[key];
+        }
+      }
       if (filter.includes(feature.properties.areacd.slice(0, 3))) {
         if (lookup[feature.properties.areacd]) {
-          lookup[feature.properties.areacd].years.push(geo.yr + 2000);
+          const existing = lookup[feature.properties.areacd];
+          existing.years.push(geo.yr + 2000);
+          // Areas can be renamed without a new code. Years are read in order, so this
+          // keeps the latest name.
+          for (const key of ["areanm", "areanmw"]) {
+            const name = feature.properties[key];
+            if (name) existing[key] = name;
+          }
         } else {
           const props = {};
           for (const key of Object.keys(feature.properties)) {
             // Filter to remove empty props
-            if (feature.properties[key] && feature.properties[key] !== " ") {
+            if (feature.properties[key]) {
               props[key] = feature.properties[key];
             }
           }
@@ -80,26 +100,24 @@ function addMSOANames() {
   const msoa_raw = readFileSync(msoa_path, {encoding: 'utf8', flag: 'r'});
   const rows = csvParse(msoa_raw);
   for (const row of rows) {
+    if (!lookup[row.msoa21cd]) continue;
     lookup[row.msoa21cd].hclnm = row.msoa21hclnm;
     if (row.msoa21hclnmw) lookup[row.msoa21cd].hclnmw = row.msoa21hclnmw;
   }
 }
 
-const getKey = (str) => str.match(/[a-z]*(?=\d)/)?.[0];
-const sorted_keys = geo_config.map(g => g.key);
-
-const files = readdirSync(geo_dir)
-  .filter(f => f.slice(-8) === ".json.gz" && f.includes("_bfc"))
-  .sort((a, b) => {
-    return sorted_keys.indexOf(getKey(a)) - sorted_keys.indexOf(getKey(b));
-  });
-const geos = files.map(f => {
-  return {
-    path: f,
-    cd: getKey(f),
-    yr: +f.match(/\d\d/)[0]
-  };
-});
+// Read the BFC file for every configured geography and year, in config order.
+// (Driven by the config rather than the folder contents, so stray files are ignored
+// and missing ones are reported up front.)
+const geos = geo_config.flatMap(g => g.years.map(year => {
+  const yr = year % 100;
+  return {path: `${g.key}${String(yr).padStart(2, "0")}_bfc.json.gz`, cd: g.key, yr};
+}));
+const missing = geos.filter(g => !existsSync(`${geo_dir}/${g.path}`));
+if (missing.length > 0) {
+  console.error(`Missing boundary files (run download-files first):\n${missing.map(g => `  ${geo_dir}/${g.path}`).join("\n")}`);
+  process.exit(1);
+}
 
 for (const geo of geos) {
   await getGeoMetadata(geo);
@@ -117,6 +135,13 @@ for (const d of data) {
       d.end = typeyrs[typekey][last_valid_index + 1] - 1;
     };
   }
+}
+
+// Areas of an abolished geography (with a lastYear in geo-config.js) end then, even
+// though no later boundaries show them ending
+for (const d of data) {
+  const lastYear = geo_config.find(g => g.key === cdKeyLookup[d.areacd.slice(0, 3)])?.lastYear;
+  if (lastYear && (!d.end || d.end > lastYear)) d.end = lastYear;
 }
 
 writeFileSync(outpath, csvFormat(data, cols));

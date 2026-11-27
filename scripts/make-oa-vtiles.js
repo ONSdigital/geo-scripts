@@ -7,6 +7,7 @@ import zlib from "zlib";
 import readline from "line-by-line";
 import mapshaper from "mapshaper";
 import { csvParse, makeLookup, run, clearTemp } from "./utils.js";
+import { dirs } from "../config/paths.js";
 
 const oa_bounds_file = "oa21_bgc";
 const oa_lookup_file = "lookup_vtiles_oa21";
@@ -31,9 +32,9 @@ function runMapshaper(cmd) {
 
 function mergeLookup(geo_file, lookup_file) {
   return new Promise((resolve) => {
-    const lookup_data = csvParse(readFileSync(`./input/lookups/${lookup_file}.csv`, {encoding: 'utf8', flag: 'r'}));
+    const lookup_data = csvParse(readFileSync(`${dirs.lookups}/${lookup_file}.csv`, {encoding: 'utf8', flag: 'r'}));
     const lookup = makeLookup(lookup_data);
-    const input = `./input/boundaries/${geo_file}.json.gz`;
+    const input = `${dirs.boundaries}/${geo_file}.json.gz`;
     const output = `./temp/${geo_file}.json`;
 
     if (!existsSync(output)) {
@@ -90,7 +91,7 @@ for (const zoom of zooms) {
   const output = `./temp/oa21_z${zoom.min}-${max}.mbtiles`;
   steps.push({cmd: `tippecanoe -o ${output} --read-parallel --detect-shared-borders --no-feature-limit --no-tile-size-limit -Z ${max} -z ${zoom.min} -l boundaries ${input}`, output});
 }
-output = `./output/vtiles/oa21.mbtiles`;
+output = `${dirs.vtiles}/oa21.mbtiles`;
 steps.push({cmd: `tile-join -o ${output} --no-tile-size-limit ${steps.map(s => s.output).join(" ")}`, output});
 
 console.log("Making vector tiles");
